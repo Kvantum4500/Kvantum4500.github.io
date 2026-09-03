@@ -337,13 +337,25 @@ let viewingWeek = clamp(getCurrentWeekIndex(), 1, WEEKS_TOTAL);
 let activeTab = 'dashboard';
 let openAccordion = null;
 
+// Hiányzó/sérült mezők pótlása, hogy egy kézzel szerkesztett vagy régebbi
+// export importálása se tudjon "undefined"-et megjeleníteni vagy elszállni.
+function normalizeState(s){
+  if(!s.meta || typeof s.meta !== 'object') s.meta = {};
+  if(typeof s.meta.name !== 'string') s.meta.name = '';
+  if(typeof s.meta.startDate !== 'string') s.meta.startDate = new Date().toISOString().slice(0,10);
+  if(!Array.isArray(s.quarterReflections) || s.quarterReflections.length !== 4) s.quarterReflections = ['','','',''];
+  s.weeks.forEach(w=>{ if(!Array.isArray(w.quests)) w.quests = []; });
+  if(typeof s.onboarded !== 'boolean') s.onboarded = false;
+  return s;
+}
+
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return defaultState();
     const parsed = JSON.parse(raw);
     if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) return defaultState();
-    return parsed;
+    return normalizeState(parsed);
   }catch(e){
     return defaultState();
   }
@@ -409,8 +421,9 @@ function currentStreak(){
   const cur = getCurrentWeekIndex();
   let streak=0;
   for(let w=cur; w>=1; w--){
-    if(weekScore(w) > 0) streak++;
-    else break;
+    if(weekScore(w) > 0){ streak++; continue; }
+    if(w===cur) continue; // a folyamatban lévő hét még nem teljesített pontja nem szakítja meg a korábbi sorozatot
+    break;
   }
   return streak;
 }
@@ -468,9 +481,8 @@ function generateAgentReport(track){
   return {status, icon, text, suggestion, level:lvl.level, neglected};
 }
 
-// PM: a szakterületi ügynökök jelentéseiből állítja össze a heti prioritást.
-function generatePMMessage(){
-  const reports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+// PM: a szakterületi ügynökök (már elkészített) jelentéseiből állítja össze a heti prioritást.
+function generatePMMessage(reports){
   const warnings = reports.filter(x=>x.r.status==='warning').sort((a,b)=>b.r.neglected-a.r.neglected);
   const cur = getCurrentWeekIndex();
   const overall = overallLevel(overallTotalXp());
@@ -558,7 +570,7 @@ function importData(file){
     try{
       const parsed = JSON.parse(e.target.result);
       if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) throw new Error('invalid');
-      state = parsed;
+      state = normalizeState(parsed);
       saveState();
       viewingWeek = clamp(getCurrentWeekIndex(),1,WEEKS_TOTAL);
       closeModal();
@@ -583,6 +595,7 @@ function resetAll(){
     const name = state.meta.name;
     state = defaultState();
     state.meta.name = name;
+    state.onboarded = true;
     saveState();
     viewingWeek = 1;
     closeModal();
@@ -635,8 +648,8 @@ function renderTabs(){
 
 function renderDashboard(){
   const cur = getCurrentWeekIndex();
-  const pmLines = generatePMMessage();
   const agentReports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+  const pmLines = generatePMMessage(agentReports);
 
   const teamCards = agentReports.map(({t,r})=>`
     <div class="card track-card" style="--tc:${t.color}">
@@ -824,7 +837,7 @@ function renderTracksTab(){
     const xp = trackTotalXp(t.id);
     const lvl = trackLevel(xp);
     let doneCount=0, lastQuest=null;
-    state.weeks.forEach((w,idx)=>{
+    state.weeks.forEach(w=>{
       w.quests.forEach(q=>{
         if(q.trackId===t.id && q.done){
           doneCount++;
@@ -899,7 +912,7 @@ function renderSettingsTab(){
         <h3>Karakter beállítások</h3>
         <div class="field">
           <label>Karakter neve</label>
-          <input type="text" id="nameInput" value="${escapeHtml(state.meta.name)}" placeholder="A te neved">
+          <input type="text" id="nameInput" value="${escapeHtml(state.meta.name || '')}" placeholder="A te neved">
         </div>
         <div class="field">
           <label>Kampány kezdő dátuma (1. hét kezdete)</label>
