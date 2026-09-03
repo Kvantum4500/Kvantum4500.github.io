@@ -303,6 +303,20 @@ const TEMPLATES = {
   ]
 };
 
+// Vizuális fejlődési szakaszok skill fánként — [minSzint, ikon, címke].
+// Ahogy nő a szint, a karakter/felszerelés/setup vizuálisan is fejlődik.
+const TIER_STAGES = {
+  freedom:[[1,'🌧️','Nehéz napok'],[3,'🌤️','Derülő égbolt'],[5,'🦋','Szabad szárnyalás'],[8,'🌟','Teljes lezárás']],
+  finance:[[1,'🪙','Első fillérek'],[3,'💵','Stabil költségvetés'],[5,'🏦','Növekvő tartalék'],[8,'🏰','Anyagi biztonság vára']],
+  mental:[[1,'🕯️','Első lépések'],[3,'🧘','Egyensúly'],[5,'🌿','Belső nyugalom'],[8,'✨','Tudatos elme']],
+  physical:[[1,'🧍','Kezdő kalandor'],[3,'🏃','Formába lendülve'],[5,'💪','Erős harcos'],[8,'🦾','Legendás bajnok']],
+  massage:[[1,'🧴','Alapfelszerelés'],[3,'💆','Első ügyfelek'],[5,'🏅','Elismert mester'],[8,'🏛️','Saját stúdió']],
+  video:[[1,'📱','Telefonos felvétel'],[3,'📷','Kamera és vágás'],[5,'🎬','Stúdió minőség'],[8,'🚁','Teljes produkció']],
+  camper:[[1,'📐','Tervrajzok'],[3,'🔧','Építés alatt'],[5,'🚐','Beköltözhető camper'],[8,'🏕️','Álom camper kész']],
+  coding:[[1,'💻','Alap laptop'],[3,'🖥️','Kétmonitoros setup'],[5,'⌨️','Fejlesztői battlestation'],[8,'🖧','Profi stúdió szoba']],
+  relationship:[[1,'🌱','Ismerkedő fázis'],[3,'🤝','Együtt építve'],[5,'💞','Erős kötelék'],[8,'👑','Csapat egy életre']]
+};
+
 const WEEKS_TOTAL = 52;
 const QUARTER_TARGET_XP = 300; // cél / negyedév / skill fa a boss fighthoz
 const STORAGE_KEY = 'eletrpg_v1';
@@ -580,9 +594,10 @@ function resetAll(){
 
 const TABS = [
   {id:'dashboard', label:'⚡ Vezérlőpult'},
+  {id:'map', label:'🗺️ Térkép'},
   {id:'week', label:'📜 Heti küldetések'},
   {id:'tracks', label:'🌳 Skill fák'},
-  {id:'timeline', label:'🗺️ Kampány idővonal'},
+  {id:'timeline', label:'📅 Naptár & Boss Fight'},
   {id:'settings', label:'⚙️ Adatkezelés'}
 ];
 
@@ -591,6 +606,7 @@ function render(){
   renderTabs();
   const app = document.getElementById('app');
   if(activeTab==='dashboard') app.innerHTML = renderDashboard();
+  else if(activeTab==='map') app.innerHTML = renderMapTab();
   else if(activeTab==='week') app.innerHTML = renderWeekTab();
   else if(activeTab==='tracks') app.innerHTML = renderTracksTab();
   else if(activeTab==='timeline') app.innerHTML = renderTimelineTab();
@@ -649,6 +665,96 @@ function renderDashboard(){
       <h3>Csapat — szakterületi ügynökök</h3>
       <p class="muted small" style="margin-bottom:10px;">Minden ügynök csak a saját területét figyeli és javasol rá egy küldetést; a PM ezekből állítja össze a heti prioritást.</p>
       <div class="grid grid-3">${teamCards}</div>
+    </div>
+  `;
+}
+
+function currentTierOf(trackId, level){
+  const stages = TIER_STAGES[trackId];
+  let current = stages[0];
+  stages.forEach(s=>{ if(level>=s[0]) current=s; });
+  return current;
+}
+
+function renderTierPathRow(trackId, level, color){
+  const stages = TIER_STAGES[trackId];
+  return stages.map((s,i)=>{
+    const reached = level >= s[0];
+    const connector = i>0 ? `<div style="flex:0 0 14px;height:2px;background:${reached?color:'var(--border)'};margin-top:18px;"></div>` : '';
+    return connector + `
+      <div style="flex:1;min-width:64px;text-align:center;">
+        <div style="width:36px;height:36px;border-radius:50%;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-size:18px;
+          background:${reached? color+'30':'rgba(255,255,255,0.05)'};border:2px solid ${reached? color:'var(--border)'};">${s[1]}</div>
+        <div class="small" style="color:${reached?'var(--text)':'var(--muted)'};line-height:1.2;">${s[2]}</div>
+        <div class="small muted">Szint ${s[0]}+</div>
+      </div>`;
+  }).join('');
+}
+
+function renderTrackPathCard(t){
+  const xp = trackTotalXp(t.id);
+  const lvl = trackLevel(xp);
+  const stage = currentTierOf(t.id, lvl.level);
+  return `
+    <div class="card track-card" style="--tc:${t.color}">
+      <div class="track-head">
+        <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
+        <span class="lvl-badge">Szint ${lvl.level}</span>
+      </div>
+      <p class="small muted" style="margin-bottom:8px;">Jelenlegi forma: <b style="color:${t.color}">${stage[1]} ${stage[2]}</b></p>
+      <div style="display:flex;align-items:flex-start;overflow-x:auto;padding-bottom:4px;">${renderTierPathRow(t.id, lvl.level, t.color)}</div>
+    </div>`;
+}
+
+function renderMapTab(){
+  const cur = getCurrentWeekIndex();
+  const cols = 13, rows = 4;
+  const marginX = 50, marginY = 55, rowGap = 145, colGap = 58;
+  const width = marginX*2 + (cols-1)*colGap;
+  const height = marginY*2 + (rows-1)*rowGap;
+
+  const points = [];
+  for(let w=1; w<=WEEKS_TOTAL; w++){
+    const rowIdx = Math.floor((w-1)/cols);
+    const colIdx = (w-1)%cols;
+    const xColIdx = (rowIdx%2===0) ? colIdx : (cols-1-colIdx);
+    points.push({w, x: marginX + xColIdx*colGap, y: marginY + rowIdx*rowGap});
+  }
+  const pathD = points.map((p,i)=> (i===0?'M':'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+
+  const nodesSvg = points.map(p=>{
+    const isBoss = p.w % 13 === 0;
+    const score = weekScore(p.w);
+    const isCurrent = p.w===cur;
+    const reached = p.w <= cur;
+    const fill = reached ? (score>0 || isBoss ? '#e8b64c' : 'rgba(232,182,76,0.35)') : 'rgba(255,255,255,0.08)';
+    const r = isBoss ? 15 : (isCurrent ? 12 : 8);
+    const ring = isCurrent ? `<circle cx="${p.x}" cy="${p.y}" r="${r+7}" fill="none" stroke="#f3d38a" stroke-width="2.5" opacity="0.8"><animate attributeName="r" values="${r+5};${r+11};${r+5}" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.8s" repeatCount="indefinite"/></circle>` : '';
+    const label = isBoss ? '🏰' : (isCurrent ? '🧭' : p.w);
+    const bossLabel = isBoss ? `<text x="${p.x}" y="${p.y - r - 8}" text-anchor="middle" font-size="10" fill="#c9b8f0">Q${p.w/13} Boss</text>` : '';
+    return `<g data-jump="${p.w}" style="cursor:pointer;">
+        ${ring}
+        <circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${isBoss?'#8e7cc3':'rgba(255,255,255,0.25)'}" stroke-width="${isBoss?2.5:1.5}"/>
+        <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="${isBoss||isCurrent?14:9.5}" fill="${reached?'#241a06':'#9aa1c0'}">${label}</text>
+        ${bossLabel}
+      </g>`;
+  }).join('');
+
+  return `
+    <div class="section">
+      <h3>Fő pálya — a teljes 52 hetes utazás</h3>
+      <p class="muted small">A kampányod egész éves útvonala. Kattints egy állomásra, hogy odaugorj arra a hétre.</p>
+      <div class="card" style="overflow-x:auto;">
+        <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;min-width:600px;display:block;">
+          <path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
+          ${nodesSvg}
+        </svg>
+      </div>
+    </div>
+    <div class="section">
+      <h3>A célok saját útjai</h3>
+      <p class="muted small" style="margin-bottom:10px;">Minden cél a saját tempójában fejlődik — más-más felszerelést vagy formát kapsz, ahogy haladsz benne (pl. az edzés erősíti a karaktered, a kódolás fejleszti a setupodat).</p>
+      <div class="grid grid-2">${TRACKS.map(t=>renderTrackPathCard(t)).join('')}</div>
     </div>
   `;
 }
