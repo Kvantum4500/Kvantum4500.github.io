@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Életkampány RPG</title>
+<style>
+  :root{
+    --bg:#0c0e1a; --bg2:#141830; --card:rgba(255,255,255,0.045); --card-hover:rgba(255,255,255,0.075);
+    --border:rgba(255,255,255,0.09); --gold:#e8b64c; --gold-soft:#f3d38a; --text:#eef0f7; --muted:#9aa1c0;
+    --success:#4fbf8b; --danger:#e0616b; --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse 1200px 700px at 20% -10%, rgba(142,124,195,0.18), transparent 60%),
+      radial-gradient(ellipse 1000px 700px at 100% 0%, rgba(232,182,76,0.10), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh;
+    padding-bottom:60px;
+  }
+  h1,h2,h3,h4{margin:0 0 6px;font-weight:700;letter-spacing:.2px;}
+  p{margin:0;}
+  button{font-family:inherit;cursor:pointer;}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 40px;}
+
+  .topbar{
+    background:linear-gradient(180deg, rgba(232,182,76,0.10), transparent);
+    border-bottom:1px solid var(--border);
+    padding:16px 0 10px;
+  }
+  .hero{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:space-between;}
+  .hero-left{display:flex;align-items:center;gap:14px;min-width:220px;}
+  .avatar{
+    width:58px;height:58px;border-radius:50%;
+    background:conic-gradient(var(--gold), #8e7cc3, #5aa9e6, var(--gold));
+    display:flex;align-items:center;justify-content:center;font-size:26px;
+    box-shadow:0 0 0 3px var(--bg2), 0 0 18px rgba(232,182,76,0.35);
+    flex-shrink:0;
+  }
+  .hero-name{font-size:20px;background:linear-gradient(90deg,var(--gold-soft),#fff);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .hero-sub{color:var(--muted);font-size:13px;}
+  .xpbar-wrap{flex:1;min-width:220px;max-width:340px;}
+  .xpbar{height:10px;border-radius:6px;background:rgba(255,255,255,0.08);overflow:hidden;border:1px solid var(--border);}
+  .xpbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gold-soft));}
+  .xp-label{font-size:11px;color:var(--muted);margin-top:4px;display:flex;justify-content:space-between;}
+  .week-chip{
+    background:var(--card);border:1px solid var(--border);border-radius:999px;
+    padding:8px 16px;font-size:13px;display:flex;align-items:center;gap:8px;white-space:nowrap;
+  }
+  .week-chip b{color:var(--gold-soft);}
+
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 20px;}
+  .tab-btn{
+    background:var(--card);border:1px solid var(--border);color:var(--muted);
+    padding:9px 14px;border-radius:10px;font-size:13.5px;font-weight:600;transition:.15s;
+  }
+  .tab-btn:hover{background:var(--card-hover);color:var(--text);}
+  .tab-btn.active{background:linear-gradient(180deg, rgba(232,182,76,0.22), rgba(232,182,76,0.06));border-color:rgba(232,182,76,0.5);color:var(--gold-soft);}
+
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+  .grid{display:grid;gap:14px;}
+  .grid-2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr));}
+  .grid-3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+  .section{margin-bottom:22px;}
+  .muted{color:var(--muted);}
+  .small{font-size:12.5px;}
+
+  .coach-card{border-color:rgba(232,182,76,0.35);}
+  .coach-msg{display:flex;gap:10px;padding:9px 0;border-top:1px solid var(--border);font-size:13.5px;line-height:1.4;}
+  .coach-msg:first-of-type{border-top:none;padding-top:2px;}
+  .coach-icon{flex-shrink:0;}
+
+  .track-card{border-left:4px solid var(--tc,var(--gold));position:relative;}
+  .track-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;}
+  .track-title{display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;}
+  .lvl-badge{
+    background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:8px;
+    padding:2px 9px;font-size:12px;font-weight:700;color:var(--gold-soft);
+  }
+  .track-bar{height:8px;border-radius:5px;background:rgba(255,255,255,0.08);overflow:hidden;margin:6px 0 4px;}
+  .track-bar > i{display:block;height:100%;background:var(--tc,var(--gold));}
+  .track-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);}
+
+  .week-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .nav-btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 12px;font-size:14px;}
+  .nav-btn:hover{background:var(--card-hover);}
+  .nav-btn:disabled{opacity:.35;cursor:not-allowed;}
+  .week-title{font-size:16px;font-weight:700;}
+  .week-dates{font-size:12px;color:var(--muted);}
+
+  .quest-row{
+    display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);
+    border-radius:10px;margin-bottom:8px;background:rgba(255,255,255,0.02);
+  }
+  .quest-row.done{opacity:.55;}
+  .quest-row.done .quest-text{text-decoration:line-through;}
+  .check{
+    width:22px;height:22px;border-radius:6px;border:2px solid var(--muted);flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--bg);background:none;
+  }
+  .check.on{background:var(--success);border-color:var(--success);color:#08130d;}
+  .quest-text{flex:1;font-size:14px;}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);white-space:nowrap;}
+  .xp-pill{font-size:11.5px;font-weight:700;color:var(--gold-soft);white-space:nowrap;}
+  .del-btn{background:none;border:none;color:var(--muted);font-size:16px;padding:2px 4px;}
+  .del-btn:hover{color:var(--danger);}
+
+  .btn{
+    background:linear-gradient(180deg, rgba(232,182,76,0.9), rgba(200,150,50,0.9));
+    color:#181205;border:none;border-radius:9px;padding:9px 16px;font-weight:700;font-size:13.5px;
+  }
+  .btn.secondary{background:var(--card);border:1px solid var(--border);color:var(--text);}
+  .btn.danger{background:rgba(224,97,107,0.85);color:#1a0505;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .addbox{margin-top:12px;border:1px dashed var(--border);border-radius:12px;padding:12px;}
+  .accordion-h{display:flex;justify-content:space-between;align-items:center;padding:8px 4px;cursor:pointer;font-weight:600;font-size:13.5px;background:none;border:none;color:var(--text);width:100%;text-align:left;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;padding:6px 4px 10px;}
+  .chip{
+    background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:999px;
+    padding:6px 12px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:var(--text);
+  }
+  .chip:hover{background:var(--card-hover);}
+  .agent-suggest{display:flex;width:100%;justify-content:space-between;margin-top:8px;text-align:left;}
+  .custom-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
+  select,input[type=text],input[type=date],textarea{
+    background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:8px 10px;font-size:13.5px;font-family:inherit;
+  }
+  textarea{width:100%;min-height:70px;resize:vertical;}
+  input[type=text]{flex:1;min-width:160px;}
+
+  .quarter-block{margin-bottom:18px;}
+  .weekgrid{display:grid;grid-template-columns:repeat(13,1fr);gap:5px;margin-top:8px;}
+  .weekcell{
+    aspect-ratio:1;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,0.04);
+    display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);position:relative;
+  }
+  .weekcell.current{outline:2px solid var(--gold);}
+  .weekcell.viewing{border-color:var(--gold-soft);}
+  .weekcell:hover{background:var(--card-hover);}
+
+  .boss-card{border-color:rgba(142,124,195,0.4);}
+  .boss-locked{opacity:.45;}
+
+  .toast-wrap{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:50;}
+  .toast{
+    background:var(--bg2);border:1px solid var(--gold);border-radius:10px;padding:12px 16px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.4);font-size:13.5px;max-width:280px;animation:pop .25s ease;
+  }
+  @keyframes pop{from{transform:translateY(8px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;}
+  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px;max-width:420px;width:100%;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .row > *{flex:1;}
+  label{font-size:12.5px;color:var(--muted);display:block;margin-bottom:4px;}
+  .field{margin-bottom:12px;}
+
+  footer{text-align:center;color:var(--muted);font-size:11.5px;padding:30px 16px 10px;}
+
+  @media (max-width:640px){
+    .weekgrid{grid-template-columns:repeat(7,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-left">
+        <div class="avatar" id="avatarIcon">⚔️</div>
+        <div>
+          <div class="hero-name" id="heroName">Kalandor</div>
+          <div class="hero-sub" id="heroSub">Szint 1 · 0 XP</div>
+        </div>
+      </div>
+      <div class="xpbar-wrap">
+        <div class="xpbar"><i id="overallBar" style="width:0%"></i></div>
+        <div class="xp-label"><span id="overallLabel">0 / 500 XP</span><span id="streakLabel">🔥 0 hetes sorozat</span></div>
+      </div>
+      <div class="week-chip">📅 <b id="weekChipText">1. hét</b> / 52 · Q<span id="quarterChipText">1</span></div>
+    </div>
+    <div class="tabs" id="tabs"></div>
+  </div>
+</div>
+
+<div class="wrap" id="app"></div>
+
+<footer>Életkampány RPG — helyben tárolt személyes fejlődéskövető. Az adataid csak ebben a böngészőben maradnak, hacsak nem exportálod őket.</footer>
+
+<div class="toast-wrap" id="toasts"></div>
+<div id="modalRoot"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= Data ================= */
+
+const TRACKS = [
+  {id:'freedom',     name:'Lezárás & Szabadság',    icon:'🕊️', color:'#8e7cc3'},
+  {id:'finance',     name:'Anyagi Biztonság',       icon:'💰', color:'#d4af37'},
+  {id:'mental',      name:'Mentális Egészség',      icon:'🧠', color:'#5aa9e6'},
+  {id:'physical',    name:'Fizikai Egészség',       icon:'💪', color:'#e05c5c'},
+  {id:'massage',     name:'Masszázs Mesterség',     icon:'💆', color:'#4fbf8b'},
+  {id:'video',       name:'Videós Alkotóműhely',    icon:'🎥', color:'#e08a3c'},
+  {id:'camper',      name:'Camper Építés',          icon:'🚐', color:'#7fd1c1'},
+  {id:'coding',      name:'Kódolás',                icon:'💻', color:'#59c1f0'},
+  {id:'relationship',name:'Kapcsolat Újratervezés', icon:'❤️', color:'#e0668a'}
+];
+const TRACK_BY_ID = Object.fromEntries(TRACKS.map(t=>[t.id,t]));
+
+const AGENT_ROLES = {
+  freedom:'Lezárás Coach',
+  finance:'Pénzügyi Tanácsadó',
+  mental:'Mentálhigiénés Szakértő',
+  physical:'Erőnléti Edző',
+  massage:'Üzletépítési Mentor',
+  video:'Kreatív Producer',
+  camper:'Építésvezető',
+  coding:'Tech Lead',
+  relationship:'Kapcsolati Tanácsadó'
+};
+
+const TEMPLATES = {
+  freedom:[
+    {text:'Írj naplóbejegyzést a mai érzéseidről', xp:10},
+    {text:'Rakj el / törölj egy emléket, ami visszahúz', xp:15},
+    {text:'Mondj ki hangosan egy elengedő mondatot magadnak', xp:10},
+    {text:'Beszélj egy baráttal vagy terapeutával az érzéseidről', xp:25},
+    {text:'Csinálj valami újat, amit eddig egyedül nem próbáltál', xp:20},
+    {text:'Fogalmazz meg egy tanulságot az előző kapcsolatból', xp:20},
+    {text:'Tölts egy estét kizárólag magadra figyelve', xp:15},
+    {text:'Írd le, milyen embert és kapcsolatot szeretnél most', xp:25}
+  ],
+  finance:[
+    {text:'Vezesd a heti bevétel-kiadás naplót', xp:10},
+    {text:'Tegyél félre egy fix összeget megtakarításra', xp:20},
+    {text:'Mondj le egy felesleges előfizetésről', xp:15},
+    {text:'Fizess ki / csökkents egy adósságtételt', xp:30},
+    {text:'Nézz utána egy új bevételi lehetőségnek', xp:20},
+    {text:'Készíts havi költségvetés-tervet', xp:25},
+    {text:'Hasonlíts össze árakat nagyobb vásárlás előtt', xp:10}
+  ],
+  mental:[
+    {text:'10 perc meditáció vagy légzőgyakorlat', xp:10},
+    {text:'Írj le 3 dolgot, amiért hálás vagy', xp:10},
+    {text:'Tarts egy este digitális detoxot', xp:15},
+    {text:'Beszélj valakivel, akiben megbízol', xp:20},
+    {text:'Terápiás ülés vagy tudatos önreflexió', xp:30},
+    {text:'Kövess egy lefekvés előtti pihenő rutint', xp:15},
+    {text:'Tarts egy teljes pihenőnapot bűntudat nélkül', xp:20}
+  ],
+  physical:[
+    {text:'3x mozgás / edzés ezen a héten', xp:30},
+    {text:'8000+ lépés naponta legalább 5 napig', xp:25},
+    {text:'Igyál elég vizet minden nap', xp:10},
+    {text:'Tervezz és vásárolj be egészséges alapanyagot', xp:15},
+    {text:'7+ óra alvás legalább 5 éjszaka', xp:20},
+    {text:'Nyújtás vagy jóga 3x a héten', xp:15}
+  ],
+  massage:[
+    {text:'Gyakorolj egy új masszázstechnikát', xp:20},
+    {text:'Ossz meg egy ajánló / marketing posztot', xp:15},
+    {text:'Szerezz be hiányzó eszközt vagy olajat', xp:10},
+    {text:'Nézz meg egy szakmai továbbképző anyagot', xp:20},
+    {text:'Foglalj vagy tarts legalább 1 új ügyfelet', xp:30},
+    {text:'Kérj visszajelzést egy ügyféltől', xp:15}
+  ],
+  video:[
+    {text:'Gyakorolj drónfelvételt', xp:20},
+    {text:'Teszteld / állítsd be a mikrofont, vegyél fel hangot', xp:15},
+    {text:'Vágj meg és tegyél közzé egy videót', xp:30},
+    {text:'Tanulj egy új kameratechnikát vagy beállítást', xp:15},
+    {text:'Tervezz meg egy videóötletet forgatókönyvvel', xp:20}
+  ],
+  camper:[
+    {text:'Készíts vázlatot / tervet egy modulhoz', xp:20},
+    {text:'Szerezz be egy szükséges alkatrészt / anyagot', xp:15},
+    {text:'Végezz el egy barkácsfeladatot (szigetelés, bútor, villany)', xp:35},
+    {text:'Frissítsd a projekt költségvetését', xp:10},
+    {text:'Nézz meg egy referencia / inspirációs videót', xp:10}
+  ],
+  coding:[
+    {text:'1 óra fókuszált kódolás gyakorlás', xp:20},
+    {text:'Fejezz be egy kis feladatot / projektrészletet', xp:30},
+    {text:'Tanulj egy új fogalmat (tutorial, cikk)', xp:15},
+    {text:'Nézd át és refaktoráld egy régi kódrészleted', xp:20},
+    {text:'Told fel / commitolj egy haladást', xp:10}
+  ],
+  relationship:[
+    {text:'Tölts minőségi időt telefon nélkül', xp:20},
+    {text:'Kezdeményezz őszinte beszélgetést egy nehéz témáról', xp:30},
+    {text:'Tegyél egy apró meglepetést vagy gesztust', xp:15},
+    {text:'Tűzzetek ki közös célt és beszéljétek meg', xp:25},
+    {text:'Mondj ki hangosan egy elismerést / köszönetet', xp:10}
+  ]
+};
+
+const WEEKS_TOTAL = 52;
+const QUARTER_TARGET_XP = 300; // cél / negyedév / skill fa a boss fighthoz
+const STORAGE_KEY = 'eletrpg_v1';
+
+/* ================= State ================= */
+
+function defaultState(){
+  return {
+    meta:{ name:'', startDate: new Date().toISOString().slice(0,10) },
+    weeks: Array.from({length:WEEKS_TOTAL}, ()=>({quests:[]})),
+    quarterReflections:['','','',''],
+    onboarded:false
+  };
+}
+
+let state = loadState();
+let viewingWeek = clamp(getCurrentWeekIndex(), 1, WEEKS_TOTAL);
+let activeTab = 'dashboard';
+let openAccordion = null;
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return defaultState();
+    const parsed = JSON.parse(raw);
+    if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) return defaultState();
+    return parsed;
+  }catch(e){
+    return defaultState();
+  }
+}
+function saveState(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function uid(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+/* ================= Date / week helpers ================= */
+
+function clamp(n,min,max){ return Math.max(min, Math.min(max,n)); }
+
+function getStartDate(){
+  return new Date(state.meta.startDate + 'T00:00:00');
+}
+function getCurrentWeekIndex(){
+  const start = getStartDate();
+  const now = new Date();
+  const diffDays = Math.floor((now - start) / 86400000);
+  return clamp(Math.floor(diffDays/7)+1, 1, WEEKS_TOTAL);
+}
+function weekDateRange(weekNum){
+  const start = getStartDate();
+  const from = new Date(start.getTime() + (weekNum-1)*7*86400000);
+  const to = new Date(from.getTime() + 6*86400000);
+  const fmt = d => d.toLocaleDateString('hu-HU', {month:'short', day:'numeric'});
+  return fmt(from) + ' – ' + fmt(to);
+}
+function quarterOf(weekNum){ return Math.floor((weekNum-1)/13); }
+
+/* ================= XP / level math ================= */
+
+function levelFromXp(xp, baseReq, growth){
+  let level=1, req=baseReq, remaining=xp;
+  while(remaining>=req){
+    remaining-=req;
+    level++;
+    req = Math.round(baseReq + (level-1)*growth);
+  }
+  return {level, into:remaining, need:req, pct: Math.min(100, Math.round(remaining/req*100))};
+}
+function trackLevel(xp){ return levelFromXp(xp, 100, 30); }
+function overallLevel(xp){ return levelFromXp(xp, 500, 120); }
+
+function trackTotalXp(trackId){
+  let sum=0;
+  state.weeks.forEach(w=>{
+    w.quests.forEach(q=>{ if(q.trackId===trackId && q.done) sum += q.xp; });
+  });
+  return sum;
+}
+function overallTotalXp(){
+  return TRACKS.reduce((s,t)=> s + trackTotalXp(t.id), 0);
+}
+function weekScore(weekNum){
+  return state.weeks[weekNum-1].quests.reduce((s,q)=> s + (q.done? q.xp : 0), 0);
+}
+function currentStreak(){
+  const cur = getCurrentWeekIndex();
+  let streak=0;
+  for(let w=cur; w>=1; w--){
+    if(weekScore(w) > 0) streak++;
+    else break;
+  }
+  return streak;
+}
+
+/* ================= AI Coach (rule-based) ================= */
+
+const QUOTES = [
+  'A kis, következetes lépések verik a nagy, egyszeri lendületet.',
+  'Nem kell tökéletesnek lenned ezen a héten — csak egy kicsit jobbnak, mint tegnap.',
+  'Amit mérsz, azt tudod fejleszteni is.',
+  'A gyógyulás és a fejlődés nem egyenes vonal — a visszaesés is a folyamat része.',
+  'Egy hét kihagyás nem törli a haladást, csak egy szünet a történetben.',
+  'A jövőd nem a motivációdon múlik, hanem a rendszereiden.',
+  'Válassz ma egy apró küldetést — a karaktered azért van, hogy elinduljon, nem hogy tökéletes legyen.'
+];
+
+function neglectedWeeksCount(trackId){
+  const cur = getCurrentWeekIndex();
+  let n=0;
+  for(let w=cur; w>=1; w--){
+    if(state.weeks[w-1].quests.some(q=>q.trackId===trackId && q.done)) break;
+    n++;
+    if(n>=8) break;
+  }
+  return n;
+}
+
+// Egy szakterületi ügynök jelentése — csak a saját skill fájáról nyilatkozik.
+function generateAgentReport(track){
+  const cur = getCurrentWeekIndex();
+  const xp = trackTotalXp(track.id);
+  const lvl = trackLevel(xp);
+  const neglected = neglectedWeeksCount(track.id);
+  const doneThisWeek = state.weeks[cur-1].quests.some(q=>q.trackId===track.id && q.done);
+
+  let status, icon, text;
+  if(neglected>=2){
+    status='warning'; icon='⚠️';
+    text = `${neglected} hete nincs itt aktivitás. Javaslom egy könnyű küldetéssel újraindítani.`;
+  } else if(lvl.into>0 && lvl.need-lvl.into<=15){
+    status='success'; icon='✨';
+    text = `Már csak ${lvl.need-lvl.into} XP a következő szintig — egy küldetés és meglesz!`;
+  } else if(doneThisWeek){
+    status='success'; icon='✅';
+    text = `Ezen a héten már dolgoztunk ezen — szép munka, ${lvl.level}. szinten állunk.`;
+  } else {
+    status='info'; icon='📋';
+    text = `${lvl.level}. szinten állunk, ${xp} összes XP-vel. Van kapacitás egy új küldetésre.`;
+  }
+
+  const existingTexts = new Set(state.weeks[cur-1].quests.filter(q=>q.trackId===track.id).map(q=>q.text));
+  const pool = TEMPLATES[track.id];
+  const suggestion = pool.find(tp=>!existingTexts.has(tp.text)) || pool[Math.floor(Math.random()*pool.length)];
+
+  return {status, icon, text, suggestion, level:lvl.level, neglected};
+}
+
+// PM: a szakterületi ügynökök jelentéseiből állítja össze a heti prioritást.
+function generatePMMessage(){
+  const reports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+  const warnings = reports.filter(x=>x.r.status==='warning').sort((a,b)=>b.r.neglected-a.r.neglected);
+  const cur = getCurrentWeekIndex();
+  const overall = overallLevel(overallTotalXp());
+  const streak = currentStreak();
+
+  const lines = [];
+  if(warnings.length){
+    const names = warnings.slice(0,3).map(x=>x.t.name).join(', ');
+    lines.push({icon:'📋', text:`Heti prioritás a csapatnak: ${names}. Ide irányítsuk elsőként a figyelmet ezen a héten.`});
+  } else {
+    lines.push({icon:'✅', text:'A csapat minden területen aktív, nincs elhanyagolt front — tartsuk is így!'});
+  }
+  lines.push({icon:'📊', text:`Karakter szint: ${overall.level} · ${overallTotalXp()} összes XP · ${streak} hetes sorozat · ${cur}. hét / 52.`});
+  lines.push({icon:'📜', text: QUOTES[Math.floor(Math.random()*QUOTES.length)]});
+  return lines;
+}
+
+/* ================= Toasts ================= */
+
+function toast(text){
+  const wrap = document.getElementById('toasts');
+  const el = document.createElement('div');
+  el.className='toast';
+  el.textContent = text;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.style.transition='opacity .4s'; el.style.opacity='0'; setTimeout(()=>el.remove(),400); }, 3200);
+}
+
+/* ================= Modal ================= */
+
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+function openModal(innerHtml){
+  document.getElementById('modalRoot').innerHTML =
+    '<div class="modal-bg" onclick="if(event.target===this) closeModal()"><div class="modal">'+innerHtml+'</div></div>';
+}
+window.closeModal = closeModal;
+
+/* ================= Quest actions ================= */
+
+function addQuest(weekNum, trackId, text, xp){
+  state.weeks[weekNum-1].quests.push({id:uid(), trackId, text, xp:Number(xp), done:false, doneAt:null});
+  saveState(); render();
+}
+function toggleQuest(weekNum, questId){
+  const week = state.weeks[weekNum-1];
+  const q = week.quests.find(q=>q.id===questId);
+  if(!q) return;
+  const track = TRACK_BY_ID[q.trackId];
+  const before = trackLevel(trackTotalXp(q.trackId));
+  q.done = !q.done;
+  q.doneAt = q.done ? new Date().toISOString() : null;
+  saveState();
+  const after = trackLevel(trackTotalXp(q.trackId));
+  if(q.done){
+    if(after.level > before.level){
+      toast('🎉 Szintlépés! ' + track.name + ' — ' + after.level + '. szint!');
+    } else {
+      toast('+' + q.xp + ' XP — ' + track.name);
+    }
+  }
+  render();
+}
+function deleteQuest(weekNum, questId){
+  const week = state.weeks[weekNum-1];
+  week.quests = week.quests.filter(q=>q.id!==questId);
+  saveState(); render();
+}
+
+/* ================= Export / Import / Reset ================= */
+
+function exportData(){
+  const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'eletrpg-mentes-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+function importData(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) throw new Error('invalid');
+      state = parsed;
+      saveState();
+      viewingWeek = clamp(getCurrentWeekIndex(),1,WEEKS_TOTAL);
+      closeModal();
+      render();
+      toast('Adatok betöltve.');
+    }catch(err){
+      toast('Hibás fájl — nem sikerült betölteni.');
+    }
+  };
+  reader.readAsText(file);
+}
+function resetAll(){
+  openModal(`
+    <h3>Biztosan újrakezded?</h3>
+    <p class="muted small">Ez törli az összes hetet és küldetést ebben a böngészőben. Ha fontos, előbb exportáld az adataidat.</p>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn secondary" onclick="closeModal()">Mégse</button>
+      <button class="btn danger" id="confirmResetBtn">Törlés és újrakezdés</button>
+    </div>
+  `);
+  document.getElementById('confirmResetBtn').onclick = ()=>{
+    const name = state.meta.name;
+    state = defaultState();
+    state.meta.name = name;
+    saveState();
+    viewingWeek = 1;
+    closeModal();
+    render();
+  };
+}
+
+/* ================= Rendering ================= */
+
+const TABS = [
+  {id:'dashboard', label:'⚡ Vezérlőpult'},
+  {id:'week', label:'📜 Heti küldetések'},
+  {id:'tracks', label:'🌳 Skill fák'},
+  {id:'timeline', label:'🗺️ Kampány idővonal'},
+  {id:'settings', label:'⚙️ Adatkezelés'}
+];
+
+function render(){
+  renderHeader();
+  renderTabs();
+  const app = document.getElementById('app');
+  if(activeTab==='dashboard') app.innerHTML = renderDashboard();
+  else if(activeTab==='week') app.innerHTML = renderWeekTab();
+  else if(activeTab==='tracks') app.innerHTML = renderTracksTab();
+  else if(activeTab==='timeline') app.innerHTML = renderTimelineTab();
+  else if(activeTab==='settings') app.innerHTML = renderSettingsTab();
+  bindDynamicHandlers();
+}
+
+function renderHeader(){
+  const totalXp = overallTotalXp();
+  const lvl = overallLevel(totalXp);
+  const cur = getCurrentWeekIndex();
+  document.getElementById('heroName').textContent = state.meta.name || 'Kalandor';
+  document.getElementById('heroSub').textContent = 'Szint ' + lvl.level + ' · ' + totalXp + ' összes XP';
+  document.getElementById('overallBar').style.width = lvl.pct + '%';
+  document.getElementById('overallLabel').textContent = lvl.into + ' / ' + lvl.need + ' XP (' + lvl.level + '. szint)';
+  document.getElementById('streakLabel').textContent = '🔥 ' + currentStreak() + ' hetes sorozat';
+  document.getElementById('weekChipText').textContent = cur + '. hét';
+  document.getElementById('quarterChipText').textContent = (quarterOf(cur)+1);
+}
+
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = TABS.map(t=>
+    `<button class="tab-btn ${activeTab===t.id?'active':''}" data-tab="${t.id}">${t.label}</button>`
+  ).join('');
+}
+
+function renderDashboard(){
+  const cur = getCurrentWeekIndex();
+  const pmLines = generatePMMessage();
+  const agentReports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+
+  const teamCards = agentReports.map(({t,r})=>`
+    <div class="card track-card" style="--tc:${t.color}">
+      <div class="track-head">
+        <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
+        <span class="lvl-badge">Szint ${r.level}</span>
+      </div>
+      <p class="small muted" style="margin-bottom:6px;">${AGENT_ROLES[t.id]}</p>
+      <div class="coach-msg" style="padding-top:0;border-top:none;"><span class="coach-icon">${r.icon}</span><span>${r.text}</span></div>
+      <button class="chip agent-suggest" data-suggest='${JSON.stringify({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${r.suggestion.text} <span class="xp-pill">+${r.suggestion.xp}</span></button>
+    </div>`
+  ).join('');
+
+  return `
+    <div class="section">
+      <div class="card coach-card">
+        <h3>🧭 Projektvezető (PM)</h3>
+        <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${m.text}</span></div>`).join('')}</div>
+      </div>
+    </div>
+    <div class="section">
+      <h3>Ez heti állás — ${cur}. hét</h3>
+      <p class="muted small">Ezen a héten eddig szerzett XP: <b style="color:var(--gold-soft)">${weekScore(cur)}</b></p>
+    </div>
+    <div class="section">
+      <h3>Csapat — szakterületi ügynökök</h3>
+      <p class="muted small" style="margin-bottom:10px;">Minden ügynök csak a saját területét figyeli és javasol rá egy küldetést; a PM ezekből állítja össze a heti prioritást.</p>
+      <div class="grid grid-3">${teamCards}</div>
+    </div>
+  `;
+}
+
+function renderWeekTab(){
+  const w = state.weeks[viewingWeek-1];
+  const cur = getCurrentWeekIndex();
+  const quests = [...w.quests].sort((a,b)=> (a.done - b.done));
+  const questRows = quests.map(q=>{
+    const track = TRACK_BY_ID[q.trackId];
+    return `
+      <div class="quest-row ${q.done?'done':''}">
+        <button class="check ${q.done?'on':''}" data-toggle="${q.id}">${q.done?'✓':''}</button>
+        <span class="quest-text">${escapeHtml(q.text)}</span>
+        <span class="tag" style="border-color:${track.color}55;color:${track.color}">${track.icon} ${track.name}</span>
+        <span class="xp-pill">+${q.xp} XP</span>
+        <button class="del-btn" data-del="${q.id}" title="Törlés">✕</button>
+      </div>`;
+  }).join('') || '<p class="muted small">Még nincs küldetés ezen a héten. Adj hozzá egyet lentebb.</p>';
+
+  const accordions = TRACKS.map(t=>{
+    const chips = TEMPLATES[t.id].map(tp =>
+      `<button class="chip" data-quick='${JSON.stringify({trackId:t.id, text:tp.text, xp:tp.xp})}'>${t.icon} ${tp.text} <span class="xp-pill">+${tp.xp}</span></button>`
+    ).join('');
+    const isOpen = openAccordion===t.id;
+    return `
+      <div>
+        <button class="accordion-h" data-accordion="${t.id}">${t.icon} ${t.name} ${isOpen?'▲':'▼'}</button>
+        ${isOpen ? `<div class="chips">${chips}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="week-nav">
+      <button class="nav-btn" id="prevWeekBtn" ${viewingWeek<=1?'disabled':''}>◀</button>
+      <div>
+        <div class="week-title">${viewingWeek}. hét</div>
+        <div class="week-dates">${weekDateRange(viewingWeek)} · Q${quarterOf(viewingWeek)+1}</div>
+      </div>
+      <button class="nav-btn" id="nextWeekBtn" ${viewingWeek>=WEEKS_TOTAL?'disabled':''}>▶</button>
+      ${viewingWeek!==cur ? `<button class="btn secondary" id="jumpCurrentBtn">Ugrás a mai héthez (${cur}.)</button>` : ''}
+      <span class="week-chip">Heti pontszám: <b>${weekScore(viewingWeek)} XP</b></span>
+    </div>
+
+    <div class="section">${questRows}</div>
+
+    <div class="addbox">
+      <h4>+ Küldetés hozzáadása</h4>
+      <p class="muted small">Válassz egy sablont a skill fák alatt, vagy adj hozzá saját küldetést.</p>
+      ${accordions}
+      <div class="custom-form">
+        <select id="customTrack">${TRACKS.map(t=>`<option value="${t.id}">${t.icon} ${t.name}</option>`).join('')}</select>
+        <input type="text" id="customText" placeholder="Saját küldetés szövege...">
+        <select id="customXp">
+          <option value="10">Könnyű (10 XP)</option>
+          <option value="20" selected>Közepes (20 XP)</option>
+          <option value="35">Nehéz (35 XP)</option>
+        </select>
+        <button class="btn" id="customAddBtn">Hozzáadás</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTracksTab(){
+  const cards = TRACKS.map(t=>{
+    const xp = trackTotalXp(t.id);
+    const lvl = trackLevel(xp);
+    let doneCount=0, lastQuest=null;
+    state.weeks.forEach((w,idx)=>{
+      w.quests.forEach(q=>{
+        if(q.trackId===t.id && q.done){
+          doneCount++;
+          if(!lastQuest || new Date(q.doneAt) > new Date(lastQuest.doneAt)) lastQuest = q;
+        }
+      });
+    });
+    return `
+      <div class="card track-card" style="--tc:${t.color}">
+        <div class="track-head">
+          <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
+          <span class="lvl-badge">Szint ${lvl.level}</span>
+        </div>
+        <div class="track-bar"><i style="width:${lvl.pct}%; --tc:${t.color}"></i></div>
+        <div class="track-meta"><span>${lvl.into} / ${lvl.need} XP a köv. szintig</span><span>Összesen: ${xp} XP</span></div>
+        <p class="small muted" style="margin-top:8px;">Teljesített küldetések: <b>${doneCount}</b></p>
+        ${lastQuest ? `<p class="small muted">Utoljára: "${escapeHtml(lastQuest.text)}"</p>` : ''}
+      </div>`;
+  }).join('');
+  return `<div class="section"><h3>Karakterlap — Skill fák</h3><div class="grid grid-2">${cards}</div></div>`;
+}
+
+function renderTimelineTab(){
+  const cur = getCurrentWeekIndex();
+  let blocks = '';
+  for(let q=0; q<4; q++){
+    const startW = q*13+1, endW = q*13+13;
+    let cells = '';
+    for(let w=startW; w<=endW; w++){
+      const score = weekScore(w);
+      const intensity = score===0 ? 0.04 : Math.min(0.9, 0.15 + score/150);
+      cells += `<div class="weekcell ${w===cur?'current':''} ${w===viewingWeek?'viewing':''}" data-jump="${w}"
+                  style="background:rgba(232,182,76,${intensity})" title="${w}. hét — ${score} XP">${w}</div>`;
+    }
+    const started = cur >= startW;
+    const qXpByTrack = TRACKS.map(t=>{
+      let sum=0;
+      for(let w=startW; w<=endW; w++){
+        state.weeks[w-1].quests.forEach(qu=>{ if(qu.trackId===t.id && qu.done) sum+=qu.xp; });
+      }
+      return {t, sum};
+    });
+    const bossBars = qXpByTrack.map(({t,sum})=>{
+      const pct = Math.min(100, Math.round(sum/QUARTER_TARGET_XP*100));
+      return `<div style="margin-bottom:6px;">
+        <div class="track-meta"><span>${t.icon} ${t.name}</span><span>${sum} / ${QUARTER_TARGET_XP} XP</span></div>
+        <div class="track-bar"><i style="width:${pct}%; --tc:${t.color}"></i></div>
+      </div>`;
+    }).join('');
+
+    blocks += `
+      <div class="quarter-block">
+        <h3>Q${q+1} — ${startW}–${endW}. hét ${!started?'🔒':''}</h3>
+        <div class="weekgrid">${cells}</div>
+        <div class="card boss-card ${!started?'boss-locked':''}" style="margin-top:10px;">
+          <h4>⚔️ Negyedéves Boss Fight</h4>
+          ${started ? `
+            ${bossBars}
+            <label style="margin-top:10px;">Negyedéves reflexió</label>
+            <textarea data-reflection="${q}" placeholder="Mit tanultál ebben a negyedévben? Mi működött, mi nem?">${escapeHtml(state.quarterReflections[q]||'')}</textarea>
+          ` : `<p class="muted small">Ez a negyedév még nem kezdődött el.</p>`}
+        </div>
+      </div>`;
+  }
+  return `<div class="section"><h3>Kampány idővonal — 52 hét</h3>${blocks}</div>`;
+}
+
+function renderSettingsTab(){
+  return `
+    <div class="section grid grid-2">
+      <div class="card">
+        <h3>Karakter beállítások</h3>
+        <div class="field">
+          <label>Karakter neve</label>
+          <input type="text" id="nameInput" value="${escapeHtml(state.meta.name)}" placeholder="A te neved">
+        </div>
+        <div class="field">
+          <label>Kampány kezdő dátuma (1. hét kezdete)</label>
+          <input type="date" id="startDateInput" value="${state.meta.startDate}">
+        </div>
+        <button class="btn" id="saveSettingsBtn">Mentés</button>
+      </div>
+      <div class="card">
+        <h3>Adatkezelés</h3>
+        <p class="muted small">Az adataid csak ebben a böngészőben tárolódnak (localStorage). Exportáld rendszeresen, hogy ne veszítsd el, vagy hogy másik gépen is folytathasd.</p>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn secondary" id="exportBtn">⬇ Exportálás (JSON)</button>
+          <button class="btn secondary" id="importBtn">⬆ Importálás</button>
+        </div>
+        <input type="file" id="importFile" accept="application/json" style="display:none">
+        <div style="margin-top:14px;">
+          <button class="btn danger" id="resetBtn">Kampány újrakezdése</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* ================= Event binding ================= */
+
+function bindDynamicHandlers(){
+  document.querySelectorAll('[data-toggle]').forEach(el=>{
+    el.onclick = ()=> toggleQuest(viewingWeek, el.getAttribute('data-toggle'));
+  });
+  document.querySelectorAll('[data-del]').forEach(el=>{
+    el.onclick = ()=> deleteQuest(viewingWeek, el.getAttribute('data-del'));
+  });
+  document.querySelectorAll('[data-accordion]').forEach(el=>{
+    el.onclick = ()=>{
+      const id = el.getAttribute('data-accordion');
+      openAccordion = openAccordion===id ? null : id;
+      render();
+    };
+  });
+  document.querySelectorAll('[data-quick]').forEach(el=>{
+    el.onclick = ()=>{
+      const d = JSON.parse(el.getAttribute('data-quick'));
+      addQuest(viewingWeek, d.trackId, d.text, d.xp);
+    };
+  });
+  document.querySelectorAll('[data-suggest]').forEach(el=>{
+    el.onclick = ()=>{
+      const d = JSON.parse(el.getAttribute('data-suggest'));
+      const cur = getCurrentWeekIndex();
+      addQuest(cur, d.trackId, d.text, d.xp);
+      toast('Küldetés hozzáadva a(z) ' + cur + '. héthez — ' + TRACK_BY_ID[d.trackId].name);
+    };
+  });
+  const prevBtn = document.getElementById('prevWeekBtn');
+  if(prevBtn) prevBtn.onclick = ()=>{ viewingWeek = clamp(viewingWeek-1,1,WEEKS_TOTAL); openAccordion=null; render(); };
+  const nextBtn = document.getElementById('nextWeekBtn');
+  if(nextBtn) nextBtn.onclick = ()=>{ viewingWeek = clamp(viewingWeek+1,1,WEEKS_TOTAL); openAccordion=null; render(); };
+  const jumpBtn = document.getElementById('jumpCurrentBtn');
+  if(jumpBtn) jumpBtn.onclick = ()=>{ viewingWeek = getCurrentWeekIndex(); openAccordion=null; render(); };
+  const customAddBtn = document.getElementById('customAddBtn');
+  if(customAddBtn) customAddBtn.onclick = ()=>{
+    const trackId = document.getElementById('customTrack').value;
+    const text = document.getElementById('customText').value.trim();
+    const xp = document.getElementById('customXp').value;
+    if(!text){ toast('Írj be egy küldetés szöveget.'); return; }
+    addQuest(viewingWeek, trackId, text, xp);
+  };
+  document.querySelectorAll('[data-jump]').forEach(el=>{
+    el.onclick = ()=>{ viewingWeek = Number(el.getAttribute('data-jump')); activeTab='week'; openAccordion=null; render(); };
+  });
+  document.querySelectorAll('[data-reflection]').forEach(el=>{
+    el.onchange = ()=>{
+      const idx = Number(el.getAttribute('data-reflection'));
+      state.quarterReflections[idx] = el.value;
+      saveState();
+    };
+  });
+
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  if(saveSettingsBtn) saveSettingsBtn.onclick = ()=>{
+    state.meta.name = document.getElementById('nameInput').value.trim();
+    state.meta.startDate = document.getElementById('startDateInput').value;
+    saveState();
+    viewingWeek = clamp(getCurrentWeekIndex(),1,WEEKS_TOTAL);
+    render();
+    toast('Beállítások mentve.');
+  };
+  const exportBtn = document.getElementById('exportBtn');
+  if(exportBtn) exportBtn.onclick = exportData;
+  const importBtn = document.getElementById('importBtn');
+  const importFile = document.getElementById('importFile');
+  if(importBtn) importBtn.onclick = ()=> importFile.click();
+  if(importFile) importFile.onchange = ()=>{ if(importFile.files[0]) importData(importFile.files[0]); };
+  const resetBtn = document.getElementById('resetBtn');
+  if(resetBtn) resetBtn.onclick = resetAll;
+
+  document.querySelectorAll('.tab-btn').forEach(el=>{
+    el.onclick = ()=>{ activeTab = el.getAttribute('data-tab'); openAccordion=null; render(); };
+  });
+}
+
+/* ================= Onboarding ================= */
+
+function maybeOnboard(){
+  if(state.onboarded) return;
+  openModal(`
+    <h3>⚔️ Üdv a kampányban!</h3>
+    <p class="muted small">52 hét, 9 fejlesztendő terület, heti küldetések, negyedéves boss fightok. Adj a karakterednek nevet, és indulhat az első hét.</p>
+    <div class="field" style="margin-top:14px;">
+      <label>Karakter neve</label>
+      <input type="text" id="onboardName" placeholder="pl. Kvantum">
+    </div>
+    <div class="field">
+      <label>Mikor kezdődjön az 1. hét?</label>
+      <input type="date" id="onboardDate" value="${state.meta.startDate}">
+    </div>
+    <button class="btn" id="onboardStartBtn">Kaland kezdése</button>
+  `);
+  document.getElementById('onboardStartBtn').onclick = ()=>{
+    state.meta.name = document.getElementById('onboardName').value.trim();
+    state.meta.startDate = document.getElementById('onboardDate').value || state.meta.startDate;
+    state.onboarded = true;
+    saveState();
+    viewingWeek = clamp(getCurrentWeekIndex(),1,WEEKS_TOTAL);
+    closeModal();
+    render();
+  };
+}
+
+/* ================= Init ================= */
+
+render();
+maybeOnboard();
+
+})();
+</script>
+</body>
+</html>
