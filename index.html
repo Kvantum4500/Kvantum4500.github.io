@@ -10,6 +10,15 @@
     --border:rgba(255,255,255,0.09); --gold:#e8b64c; --gold-soft:#f3d38a; --text:#eef0f7; --muted:#9aa1c0;
     --success:#4fbf8b; --danger:#e0616b; --radius:14px;
   }
+  :root[data-theme="light"]{
+    --bg:#f3f1ec; --bg2:#ffffff; --card:rgba(20,20,30,0.04); --card-hover:rgba(20,20,30,0.08);
+    --border:rgba(20,20,30,0.12); --gold:#a8790a; --gold-soft:#7a5900; --text:#1c1e2a; --muted:#5b6178;
+    --success:#1f9d64; --danger:#c23b46;
+  }
+  :root[data-theme="light"] .hero-name{
+    background:linear-gradient(90deg, var(--gold-soft), var(--text));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
@@ -144,8 +153,31 @@
   .weekcell.viewing{border-color:var(--gold-soft);}
   .weekcell:hover{background:var(--card-hover);}
 
-  .boss-card{border-color:rgba(142,124,195,0.4);}
+  .boss-card{border-color:rgba(142,124,195,0.4);position:relative;overflow:hidden;}
   .boss-locked{opacity:.45;}
+  .boss-defeated{border-color:var(--success);}
+
+  .status-icon{
+    display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;
+    border-radius:50%;flex-shrink:0;font-size:12.5px;
+  }
+  .fav-btn{font-size:15px;}
+  .fav-btn.on{color:var(--gold-soft);}
+
+  .banner{
+    display:flex;align-items:center;gap:10px;border-radius:12px;padding:12px 14px;font-size:13px;
+    background:rgba(232,182,76,0.10);border:1px solid rgba(232,182,76,0.35);margin-bottom:16px;
+  }
+
+  .confetti-wrap{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+  .confetti-piece{
+    position:absolute;top:-10px;width:8px;height:8px;border-radius:2px;opacity:0.9;
+    animation:confetti-fall 2.6s ease-in forwards;
+  }
+  @keyframes confetti-fall{
+    from{ transform:translateY(0) rotate(0deg); opacity:0.95; }
+    to{ transform:translateY(220px) rotate(360deg); opacity:0; }
+  }
 
   .toast-wrap{position:fixed;bottom:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:50;}
   .toast{
@@ -317,17 +349,30 @@ const TIER_STAGES = {
   relationship:[[1,'🌱','Ismerkedő fázis'],[3,'🤝','Együtt építve'],[5,'💞','Erős kötelék'],[8,'👑','Csapat egy életre']]
 };
 
+// A karakter általános fejlődési fázisa (a fő pálya markerén jelenik meg).
+const OVERALL_STAGES = [[1,'🧙','Zöldfülű kalandor'],[3,'🧙‍♂️','Tapasztalt vándor'],[6,'🦸','Hős'],[10,'👑','Legenda']];
+function overallStage(level){
+  let current = OVERALL_STAGES[0];
+  OVERALL_STAGES.forEach(s=>{ if(level>=s[0]) current=s; });
+  return current;
+}
+
 const WEEKS_TOTAL = 52;
 const QUARTER_TARGET_XP = 300; // cél / negyedév / skill fa a boss fighthoz
+const BOSS_DEFEAT_THRESHOLD = 5; // hány skill fának kell elérnie a negyedéves célt a boss legyőzéséhez
+const EXPORT_REMINDER_DAYS = 14;
 const STORAGE_KEY = 'eletrpg_v1';
+const STATE_VERSION = 1;
 
 /* ================= State ================= */
 
 function defaultState(){
   return {
-    meta:{ name:'', startDate: new Date().toISOString().slice(0,10) },
+    version: STATE_VERSION,
+    meta:{ name:'', startDate: new Date().toISOString().slice(0,10), theme:'dark', lastExportAt:null },
     weeks: Array.from({length:WEEKS_TOTAL}, ()=>({quests:[]})),
     quarterReflections:['','','',''],
+    favorites:[],
     onboarded:false
   };
 }
@@ -336,14 +381,19 @@ let state = loadState();
 let viewingWeek = clamp(getCurrentWeekIndex(), 1, WEEKS_TOTAL);
 let activeTab = 'dashboard';
 let openAccordion = null;
+let focusMode = false;
 
 // Hiányzó/sérült mezők pótlása, hogy egy kézzel szerkesztett vagy régebbi
 // export importálása se tudjon "undefined"-et megjeleníteni vagy elszállni.
 function normalizeState(s){
+  if(typeof s.version !== 'number') s.version = STATE_VERSION;
   if(!s.meta || typeof s.meta !== 'object') s.meta = {};
   if(typeof s.meta.name !== 'string') s.meta.name = '';
   if(typeof s.meta.startDate !== 'string') s.meta.startDate = new Date().toISOString().slice(0,10);
+  if(s.meta.theme !== 'light' && s.meta.theme !== 'dark') s.meta.theme = 'dark';
+  if(typeof s.meta.lastExportAt !== 'string') s.meta.lastExportAt = null;
   if(!Array.isArray(s.quarterReflections) || s.quarterReflections.length !== 4) s.quarterReflections = ['','','',''];
+  if(!Array.isArray(s.favorites)) s.favorites = [];
   s.weeks.forEach(w=>{ if(!Array.isArray(w.quests)) w.quests = []; });
   if(typeof s.onboarded !== 'boolean') s.onboarded = false;
   return s;
@@ -500,6 +550,59 @@ function generatePMMessage(reports){
   return lines;
 }
 
+/* ================= Kedvencek ================= */
+
+function isFavorite(trackId, text, xp){
+  return state.favorites.some(f=>f.trackId===trackId && f.text===text && f.xp===xp);
+}
+function toggleFavorite(trackId, text, xp){
+  if(isFavorite(trackId, text, xp)){
+    state.favorites = state.favorites.filter(f=>!(f.trackId===trackId && f.text===text && f.xp===xp));
+  } else {
+    state.favorites.push({trackId, text, xp});
+  }
+  saveState(); render();
+}
+
+/* ================= Export emlékeztető ================= */
+
+function daysSince(isoDate){
+  if(!isoDate) return Infinity;
+  return Math.floor((Date.now() - new Date(isoDate).getTime()) / 86400000);
+}
+function needsExportReminder(){
+  return daysSince(state.meta.lastExportAt) >= EXPORT_REMINDER_DAYS;
+}
+
+/* ================= Javaslat-priorizálás (heti csomag / fókusz mód) ================= */
+
+// Elhanyagolt (warning) területek előre, utána a legalacsonyabb szintűek — mindkét
+// funkció (heti csomag felvétele, PM fókusz mód) ugyanazt a sorrendet használja.
+function prioritizeReports(reports){
+  return [...reports].sort((a,b)=>{
+    if(a.r.status==='warning' && b.r.status!=='warning') return -1;
+    if(b.r.status==='warning' && a.r.status!=='warning') return 1;
+    return a.r.level - b.r.level;
+  });
+}
+
+function applyWeeklyPack(){
+  const cur = getCurrentWeekIndex();
+  const agentReports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+  const picks = prioritizeReports(agentReports).slice(0,3);
+  let added = 0;
+  picks.forEach(({t,r})=>{
+    const dup = state.weeks[cur-1].quests.some(q=>q.trackId===t.id && q.text===r.suggestion.text);
+    if(!dup){
+      state.weeks[cur-1].quests.push({id:uid(), trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp, done:false, doneAt:null});
+      added++;
+    }
+  });
+  if(added>0) saveState();
+  render();
+  toast(added>0 ? `${added} küldetés hozzáadva a heti csomagból.` : 'Ezek a küldetések már mind fel voltak véve ezen a héten.');
+}
+
 /* ================= Toasts ================= */
 
 function toast(text){
@@ -519,6 +622,19 @@ function openModal(innerHtml){
     '<div class="modal-bg" onclick="if(event.target===this) closeModal()"><div class="modal">'+innerHtml+'</div></div>';
 }
 window.closeModal = closeModal;
+
+function confirmModal(message, onConfirm){
+  openModal(`
+    <h3>Megerősítés</h3>
+    <p class="muted small">${escapeHtml(message)}</p>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn secondary" id="confirmNoBtn">Mégse</button>
+      <button class="btn" id="confirmYesBtn">Igen, hozzáadom</button>
+    </div>
+  `);
+  document.getElementById('confirmNoBtn').onclick = closeModal;
+  document.getElementById('confirmYesBtn').onclick = ()=>{ closeModal(); onConfirm(); };
+}
 
 /* ================= Quest actions ================= */
 
@@ -554,6 +670,8 @@ function deleteQuest(weekNum, questId){
 /* ================= Export / Import / Reset ================= */
 
 function exportData(){
+  state.meta.lastExportAt = new Date().toISOString();
+  saveState();
   const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -563,6 +681,7 @@ function exportData(){
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  render();
 }
 function importData(file){
   const reader = new FileReader();
@@ -614,7 +733,12 @@ const TABS = [
   {id:'settings', label:'⚙️ Adatkezelés'}
 ];
 
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', state.meta.theme || 'dark');
+}
+
 function render(){
+  applyTheme();
   renderHeader();
   renderTabs();
   const app = document.getElementById('app');
@@ -641,33 +765,45 @@ function renderHeader(){
 }
 
 function renderTabs(){
-  document.getElementById('tabs').innerHTML = TABS.map(t=>
-    `<button class="tab-btn ${activeTab===t.id?'active':''}" data-tab="${t.id}">${t.label}</button>`
-  ).join('');
+  document.getElementById('tabs').innerHTML = TABS.map(t=>{
+    const mark = (t.id==='settings' && needsExportReminder()) ? ' ⚠️' : '';
+    return `<button class="tab-btn ${activeTab===t.id?'active':''}" data-tab="${t.id}">${t.label}${mark}</button>`;
+  }).join('');
 }
+
+const STATUS_COLOR = {warning:'var(--danger)', success:'var(--success)', info:'var(--muted)'};
 
 function renderDashboard(){
   const cur = getCurrentWeekIndex();
   const agentReports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
   const pmLines = generatePMMessage(agentReports);
+  const visibleReports = focusMode ? prioritizeReports(agentReports).slice(0,3) : agentReports;
 
-  const teamCards = agentReports.map(({t,r})=>`
+  const teamCards = visibleReports.map(({t,r})=>{
+    const sc = STATUS_COLOR[r.status] || 'var(--muted)';
+    return `
     <div class="card track-card" style="--tc:${t.color}">
       <div class="track-head">
         <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
         <span class="lvl-badge">Szint ${r.level}</span>
       </div>
       <p class="small muted" style="margin-bottom:6px;">${AGENT_ROLES[t.id]}</p>
-      <div class="coach-msg" style="padding-top:0;border-top:none;"><span class="coach-icon">${r.icon}</span><span>${r.text}</span></div>
+      <div class="coach-msg" style="padding-top:0;border-top:none;">
+        <span class="coach-icon status-icon" style="background:${sc}22;border:1px solid ${sc};">${r.icon}</span>
+        <span>${r.text}</span>
+      </div>
       <button class="chip agent-suggest" data-suggest='${JSON.stringify({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${r.suggestion.text} <span class="xp-pill">+${r.suggestion.xp}</span></button>
-    </div>`
-  ).join('');
+    </div>`;
+  }).join('');
 
   return `
     <div class="section">
       <div class="card coach-card">
         <h3>🧭 Projektvezető (PM)</h3>
         <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${m.text}</span></div>`).join('')}</div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn secondary" id="weeklyPackBtn">📦 Heti csomag felvétele (3 küldetés)</button>
+        </div>
       </div>
     </div>
     <div class="section">
@@ -675,8 +811,11 @@ function renderDashboard(){
       <p class="muted small">Ezen a héten eddig szerzett XP: <b style="color:var(--gold-soft)">${weekScore(cur)}</b></p>
     </div>
     <div class="section">
-      <h3>Csapat — szakterületi ügynökök</h3>
-      <p class="muted small" style="margin-bottom:10px;">Minden ügynök csak a saját területét figyeli és javasol rá egy küldetést; a PM ezekből állítja össze a heti prioritást.</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
+        <h3 style="margin-bottom:0;">Csapat — szakterületi ügynökök</h3>
+        <button class="btn secondary" id="focusModeBtn">${focusMode ? '👥 Mind a 9 mutatása' : '🎯 Fókusz mód (csak a fontosak)'}</button>
+      </div>
+      <p class="muted small" style="margin-bottom:10px;">Minden ügynök csak a saját területét figyeli és javasol rá egy küldetést; a PM ezekből állítja össze a heti prioritást.${focusMode ? ' Fókusz módban csak a legfontosabb 3 terület látszik.' : ''}</p>
       <div class="grid grid-3">${teamCards}</div>
     </div>
   `;
@@ -721,6 +860,7 @@ function renderTrackPathCard(t){
 
 function renderMapTab(){
   const cur = getCurrentWeekIndex();
+  const stage = overallStage(overallLevel(overallTotalXp()).level);
   const cols = 13, rows = 4;
   const marginX = 50, marginY = 55, rowGap = 145, colGap = 58;
   const width = marginX*2 + (cols-1)*colGap;
@@ -741,14 +881,14 @@ function renderMapTab(){
     const isCurrent = p.w===cur;
     const reached = p.w <= cur;
     const fill = reached ? (score>0 || isBoss ? '#e8b64c' : 'rgba(232,182,76,0.35)') : 'rgba(255,255,255,0.08)';
-    const r = isBoss ? 15 : (isCurrent ? 12 : 8);
+    const r = isBoss ? 15 : (isCurrent ? 13 : 8);
     const ring = isCurrent ? `<circle cx="${p.x}" cy="${p.y}" r="${r+7}" fill="none" stroke="#f3d38a" stroke-width="2.5" opacity="0.8"><animate attributeName="r" values="${r+5};${r+11};${r+5}" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.8s" repeatCount="indefinite"/></circle>` : '';
-    const label = isBoss ? '🏰' : (isCurrent ? '🧭' : p.w);
+    const label = isBoss ? '🏰' : (isCurrent ? stage[1] : p.w);
     const bossLabel = isBoss ? `<text x="${p.x}" y="${p.y - r - 8}" text-anchor="middle" font-size="10" fill="#c9b8f0">Q${p.w/13} Boss</text>` : '';
     return `<g data-jump="${p.w}" style="cursor:pointer;">
         ${ring}
         <circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${isBoss?'#8e7cc3':'rgba(255,255,255,0.25)'}" stroke-width="${isBoss?2.5:1.5}"/>
-        <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="${isBoss||isCurrent?14:9.5}" fill="${reached?'#241a06':'#9aa1c0'}">${label}</text>
+        <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="${isBoss?14:(isCurrent?15:9.5)}" fill="${reached?'#241a06':'#9aa1c0'}">${label}</text>
         ${bossLabel}
       </g>`;
   }).join('');
@@ -756,7 +896,7 @@ function renderMapTab(){
   return `
     <div class="section">
       <h3>Fő pálya — a teljes 52 hetes utazás</h3>
-      <p class="muted small">A kampányod egész éves útvonala. Kattints egy állomásra, hogy odaugorj arra a hétre.</p>
+      <p class="muted small">A kampányod egész éves útvonala. Kattints egy állomásra, hogy odaugorj arra a hétre. Jelenlegi formád: <b style="color:var(--gold-soft)">${stage[1]} ${stage[2]}</b></p>
       <div class="card" style="overflow-x:auto;">
         <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;min-width:600px;display:block;">
           <path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
@@ -778,15 +918,26 @@ function renderWeekTab(){
   const quests = [...w.quests].sort((a,b)=> (a.done - b.done));
   const questRows = quests.map(q=>{
     const track = TRACK_BY_ID[q.trackId];
+    const fav = isFavorite(q.trackId, q.text, q.xp);
     return `
       <div class="quest-row ${q.done?'done':''}">
         <button class="check ${q.done?'on':''}" data-toggle="${q.id}">${q.done?'✓':''}</button>
         <span class="quest-text">${escapeHtml(q.text)}</span>
         <span class="tag" style="border-color:${track.color}55;color:${track.color}">${track.icon} ${track.name}</span>
         <span class="xp-pill">+${q.xp} XP</span>
+        <button class="del-btn fav-btn ${fav?'on':''}" data-fav='${JSON.stringify({trackId:q.trackId, text:q.text, xp:q.xp})}' title="Kedvenc">${fav?'★':'☆'}</button>
         <button class="del-btn" data-del="${q.id}" title="Törlés">✕</button>
       </div>`;
   }).join('') || '<p class="muted small">Még nincs küldetés ezen a héten. Adj hozzá egyet lentebb.</p>';
+
+  const favoriteChips = state.favorites.length ? `
+    <div>
+      <div class="accordion-h" style="cursor:default;">⭐ Kedvenceid (gyors hozzáadás)</div>
+      <div class="chips">${state.favorites.map(f=>{
+        const track = TRACK_BY_ID[f.trackId];
+        return `<button class="chip" data-quick='${JSON.stringify({trackId:f.trackId, text:f.text, xp:f.xp})}'>${track.icon} ${f.text} <span class="xp-pill">+${f.xp}</span></button>`;
+      }).join('')}</div>
+    </div>` : '';
 
   const accordions = TRACKS.map(t=>{
     const chips = TEMPLATES[t.id].map(tp =>
@@ -817,6 +968,7 @@ function renderWeekTab(){
     <div class="addbox">
       <h4>+ Küldetés hozzáadása</h4>
       <p class="muted small">Válassz egy sablont a skill fák alatt, vagy adj hozzá saját küldetést.</p>
+      ${favoriteChips}
       ${accordions}
       <div class="custom-form">
         <select id="customTrack">${TRACKS.map(t=>`<option value="${t.id}">${t.icon} ${t.name}</option>`).join('')}</select>
@@ -880,6 +1032,8 @@ function renderTimelineTab(){
       }
       return {t, sum};
     });
+    const metCount = qXpByTrack.filter(x=>x.sum>=QUARTER_TARGET_XP).length;
+    const defeated = metCount >= BOSS_DEFEAT_THRESHOLD;
     const bossBars = qXpByTrack.map(({t,sum})=>{
       const pct = Math.min(100, Math.round(sum/QUARTER_TARGET_XP*100));
       return `<div style="margin-bottom:6px;">
@@ -887,14 +1041,17 @@ function renderTimelineTab(){
         <div class="track-bar"><i style="width:${pct}%; --tc:${t.color}"></i></div>
       </div>`;
     }).join('');
+    const confetti = defeated ? renderConfetti() : '';
 
     blocks += `
       <div class="quarter-block">
         <h3>Q${q+1} — ${startW}–${endW}. hét ${!started?'🔒':''}</h3>
         <div class="weekgrid">${cells}</div>
-        <div class="card boss-card ${!started?'boss-locked':''}" style="margin-top:10px;">
-          <h4>⚔️ Negyedéves Boss Fight</h4>
+        <div class="card boss-card ${!started?'boss-locked':''} ${defeated?'boss-defeated':''}">
+          ${confetti}
+          <h4>${defeated ? '🏆 Boss legyőzve!' : '⚔️ Negyedéves Boss Fight'}</h4>
           ${started ? `
+            <p class="small muted">${metCount} / ${TRACKS.length} skill fa érte el a ${QUARTER_TARGET_XP} XP-s negyedéves célt${defeated?' — a boss legyőzve!':''}.</p>
             ${bossBars}
             <label style="margin-top:10px;">Negyedéves reflexió</label>
             <textarea data-reflection="${q}" placeholder="Mit tanultál ebben a negyedévben? Mi működött, mi nem?">${escapeHtml(state.quarterReflections[q]||'')}</textarea>
@@ -905,8 +1062,27 @@ function renderTimelineTab(){
   return `<div class="section"><h3>Kampány idővonal — 52 hét</h3>${blocks}</div>`;
 }
 
+function renderConfetti(){
+  const colors = ['#e8b64c','#8e7cc3','#5aa9e6','#4fbf8b','#e0668a'];
+  let pieces = '';
+  for(let i=0;i<24;i++){
+    const left = Math.round(Math.random()*100);
+    const delay = (Math.random()*0.6).toFixed(2);
+    const color = colors[i % colors.length];
+    pieces += `<span class="confetti-piece" style="left:${left}%;background:${color};animation-delay:${delay}s;"></span>`;
+  }
+  return `<div class="confetti-wrap">${pieces}</div>`;
+}
+
 function renderSettingsTab(){
+  const reminder = needsExportReminder() ? `
+    <div class="banner">
+      <span>⚠️</span>
+      <span>${state.meta.lastExportAt ? `Már ${daysSince(state.meta.lastExportAt)} napja nem exportáltad az adataidat.` : 'Még soha nem exportáltad az adataidat.'} Mentsd el, hogy ne veszíts el semmit!</span>
+    </div>` : '';
+
   return `
+    ${reminder}
     <div class="section grid grid-2">
       <div class="card">
         <h3>Karakter beállítások</h3>
@@ -918,11 +1094,19 @@ function renderSettingsTab(){
           <label>Kampány kezdő dátuma (1. hét kezdete)</label>
           <input type="date" id="startDateInput" value="${state.meta.startDate}">
         </div>
+        <div class="field">
+          <label>Megjelenés</label>
+          <div class="row">
+            <button class="btn ${state.meta.theme==='light'?'secondary':''}" id="themeDarkBtn">🌙 Sötét</button>
+            <button class="btn ${state.meta.theme==='light'?'':'secondary'}" id="themeLightBtn">☀️ Világos</button>
+          </div>
+        </div>
         <button class="btn" id="saveSettingsBtn">Mentés</button>
       </div>
       <div class="card">
         <h3>Adatkezelés</h3>
         <p class="muted small">Az adataid csak ebben a böngészőben tárolódnak (localStorage). Exportáld rendszeresen, hogy ne veszítsd el, vagy hogy másik gépen is folytathasd.</p>
+        <p class="small muted" style="margin-top:8px;">${state.meta.lastExportAt ? `Utolsó exportálás: ${new Date(state.meta.lastExportAt).toLocaleDateString('hu-HU')}` : 'Még nem exportáltál.'}</p>
         <div class="row" style="margin-top:12px;">
           <button class="btn secondary" id="exportBtn">⬇ Exportálás (JSON)</button>
           <button class="btn secondary" id="importBtn">⬆ Importálás</button>
@@ -959,15 +1143,29 @@ function bindDynamicHandlers(){
   document.querySelectorAll('[data-quick]').forEach(el=>{
     el.onclick = ()=>{
       const d = JSON.parse(el.getAttribute('data-quick'));
-      addQuest(viewingWeek, d.trackId, d.text, d.xp);
+      const dup = state.weeks[viewingWeek-1].quests.some(q=>q.trackId===d.trackId && q.text===d.text);
+      const doAdd = ()=> addQuest(viewingWeek, d.trackId, d.text, d.xp);
+      if(dup) confirmModal('Ezt a küldetést már hozzáadtad ezen a héten. Biztosan mégegyszer felveszed (dupla XP-ért)?', doAdd);
+      else doAdd();
     };
   });
   document.querySelectorAll('[data-suggest]').forEach(el=>{
     el.onclick = ()=>{
       const d = JSON.parse(el.getAttribute('data-suggest'));
       const cur = getCurrentWeekIndex();
-      addQuest(cur, d.trackId, d.text, d.xp);
-      toast('Küldetés hozzáadva a(z) ' + cur + '. héthez — ' + TRACK_BY_ID[d.trackId].name);
+      const dup = state.weeks[cur-1].quests.some(q=>q.trackId===d.trackId && q.text===d.text);
+      const doAdd = ()=>{
+        addQuest(cur, d.trackId, d.text, d.xp);
+        toast('Küldetés hozzáadva a(z) ' + cur + '. héthez — ' + TRACK_BY_ID[d.trackId].name);
+      };
+      if(dup) confirmModal('Ezt a küldetést már hozzáadtad ezen a héten. Biztosan mégegyszer felveszed (dupla XP-ért)?', doAdd);
+      else doAdd();
+    };
+  });
+  document.querySelectorAll('[data-fav]').forEach(el=>{
+    el.onclick = ()=>{
+      const d = JSON.parse(el.getAttribute('data-fav'));
+      toggleFavorite(d.trackId, d.text, d.xp);
     };
   });
   const prevBtn = document.getElementById('prevWeekBtn');
@@ -1012,6 +1210,15 @@ function bindDynamicHandlers(){
   if(importFile) importFile.onchange = ()=>{ if(importFile.files[0]) importData(importFile.files[0]); };
   const resetBtn = document.getElementById('resetBtn');
   if(resetBtn) resetBtn.onclick = resetAll;
+  const themeDarkBtn = document.getElementById('themeDarkBtn');
+  if(themeDarkBtn) themeDarkBtn.onclick = ()=>{ state.meta.theme='dark'; saveState(); render(); };
+  const themeLightBtn = document.getElementById('themeLightBtn');
+  if(themeLightBtn) themeLightBtn.onclick = ()=>{ state.meta.theme='light'; saveState(); render(); };
+
+  const weeklyPackBtn = document.getElementById('weeklyPackBtn');
+  if(weeklyPackBtn) weeklyPackBtn.onclick = applyWeeklyPack;
+  const focusModeBtn = document.getElementById('focusModeBtn');
+  if(focusModeBtn) focusModeBtn.onclick = ()=>{ focusMode = !focusMode; render(); };
 
   document.querySelectorAll('.tab-btn').forEach(el=>{
     el.onclick = ()=>{ activeTab = el.getAttribute('data-tab'); openAccordion=null; render(); };
