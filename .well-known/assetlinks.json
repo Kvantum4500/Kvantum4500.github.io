@@ -3,6 +3,9 @@
       "target": {
         "namespace": "android_app",
         "package_name": "com.kvantum.motivapp2",
-        "sha256_cert_fingerprints": ["2C:89:C4:60:BA:CA:AD:EB:4B:FE:98:ED:47:A2:B8:FD:6E:67:40:D9:DD:1E:73:CC:6F:BA:B8:59:D1:50:9F:A0"]
+        "sha256_cert_fingerprints": [
+          "2C:89:C4:60:BA:CA:AD:EB:4B:FE:98:ED:47:A2:B8:FD:6E:67:40:D9:DD:1E:73:CC:6F:BA:B8:59:D1:50:9F:A0",
+          "B9:26:83:4E:A7:B8:71:17:95:1F:A3:16:C5:18:4B:12:DC:C4:AB:7E:E1:07:EE:62:3C:1A:E4:C3:73:7F:97:02"
+        ]
       }
     }]
