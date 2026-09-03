@@ -125,6 +125,7 @@
     padding:6px 12px;font-size:12.5px;display:flex;align-items:center;gap:6px;color:var(--text);
   }
   .chip:hover{background:var(--card-hover);}
+  .agent-suggest{display:flex;width:100%;justify-content:space-between;margin-top:8px;text-align:left;}
   .custom-form{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;}
   select,input[type=text],input[type=date],textarea{
     background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--text);
@@ -214,6 +215,18 @@ const TRACKS = [
   {id:'relationship',name:'Kapcsolat Újratervezés', icon:'❤️', color:'#e0668a'}
 ];
 const TRACK_BY_ID = Object.fromEntries(TRACKS.map(t=>[t.id,t]));
+
+const AGENT_ROLES = {
+  freedom:'Lezárás Coach',
+  finance:'Pénzügyi Tanácsadó',
+  mental:'Mentálhigiénés Szakértő',
+  physical:'Erőnléti Edző',
+  massage:'Üzletépítési Mentor',
+  video:'Kreatív Producer',
+  camper:'Építésvezető',
+  coding:'Tech Lead',
+  relationship:'Kapcsolati Tanácsadó'
+};
 
 const TEMPLATES = {
   freedom:[
@@ -400,49 +413,65 @@ const QUOTES = [
   'Válassz ma egy apró küldetést — a karaktered azért van, hogy elinduljon, nem hogy tökéletes legyen.'
 ];
 
-function generateCoachMessages(){
-  const msgs = [];
+function neglectedWeeksCount(trackId){
   const cur = getCurrentWeekIndex();
-  const recentWindow = [cur, cur-1, cur-2].filter(w=>w>=1);
+  let n=0;
+  for(let w=cur; w>=1; w--){
+    if(state.weeks[w-1].quests.some(q=>q.trackId===trackId && q.done)) break;
+    n++;
+    if(n>=8) break;
+  }
+  return n;
+}
 
-  // Elhanyagolt terület: 0 XP az utóbbi (max 3) héten
-  let neglected = TRACKS.filter(t=>{
-    return recentWindow.every(w => !state.weeks[w-1].quests.some(q=>q.trackId===t.id && q.done));
-  });
-  if(neglected.length){
-    const t = neglected.sort((a,b)=>trackTotalXp(a.id)-trackTotalXp(b.id))[0];
-    msgs.push({icon:'⚠️', text:`„${t.name}” már ${recentWindow.length} hete nem kapott figyelmet. Egy apró, könnyű küldetés is elég lenne most itt.`});
+// Egy szakterületi ügynök jelentése — csak a saját skill fájáról nyilatkozik.
+function generateAgentReport(track){
+  const cur = getCurrentWeekIndex();
+  const xp = trackTotalXp(track.id);
+  const lvl = trackLevel(xp);
+  const neglected = neglectedWeeksCount(track.id);
+  const doneThisWeek = state.weeks[cur-1].quests.some(q=>q.trackId===track.id && q.done);
+
+  let status, icon, text;
+  if(neglected>=2){
+    status='warning'; icon='⚠️';
+    text = `${neglected} hete nincs itt aktivitás. Javaslom egy könnyű küldetéssel újraindítani.`;
+  } else if(lvl.into>0 && lvl.need-lvl.into<=15){
+    status='success'; icon='✨';
+    text = `Már csak ${lvl.need-lvl.into} XP a következő szintig — egy küldetés és meglesz!`;
+  } else if(doneThisWeek){
+    status='success'; icon='✅';
+    text = `Ezen a héten már dolgoztunk ezen — szép munka, ${lvl.level}. szinten állunk.`;
+  } else {
+    status='info'; icon='📋';
+    text = `${lvl.level}. szinten állunk, ${xp} összes XP-vel. Van kapacitás egy új küldetésre.`;
   }
 
-  // Legalacsonyabb szintű terület
-  const lowest = [...TRACKS].sort((a,b)=> trackTotalXp(a.id)-trackTotalXp(b.id))[0];
-  if(lowest && trackTotalXp(lowest.id) < 50){
-    msgs.push({icon:'🎯', text:`„${lowest.name}” van jelenleg a legkevesebb XP-n (${trackTotalXp(lowest.id)}). Ha van kapacitásod, ide érdemes egy küldetést tenni ezen a héten.`});
-  }
+  const existingTexts = new Set(state.weeks[cur-1].quests.filter(q=>q.trackId===track.id).map(q=>q.text));
+  const pool = TEMPLATES[track.id];
+  const suggestion = pool.find(tp=>!existingTexts.has(tp.text)) || pool[Math.floor(Math.random()*pool.length)];
 
-  // Közel a szintlépéshez
-  TRACKS.forEach(t=>{
-    const lvl = trackLevel(trackTotalXp(t.id));
-    if(lvl.need - lvl.into <= 15 && lvl.into>0){
-      msgs.push({icon:'✨', text:`Már csak ${lvl.need-lvl.into} XP kell a(z) „${t.name}” következő szintjéhez — egy küldetés és meglesz!`});
-    }
-  });
+  return {status, icon, text, suggestion, level:lvl.level, neglected};
+}
 
-  // Sorozat
+// PM: a szakterületi ügynökök jelentéseiből állítja össze a heti prioritást.
+function generatePMMessage(){
+  const reports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+  const warnings = reports.filter(x=>x.r.status==='warning').sort((a,b)=>b.r.neglected-a.r.neglected);
+  const cur = getCurrentWeekIndex();
+  const overall = overallLevel(overallTotalXp());
   const streak = currentStreak();
-  if(streak>=3) msgs.push({icon:'🔥', text:`${streak} hetes sorozatban vagy aktív. Ez már szokás — így épül a tartós változás.`});
-  else if(streak===0 && cur>1) msgs.push({icon:'💡', text:'Ezen a héten még nincs teljesített küldetésed. Nem baj — kezdd eggyel, a legkönnyebbel.'});
 
-  // Heti trend
-  if(cur>1){
-    const thisW = weekScore(cur), prevW = weekScore(cur-1);
-    if(prevW>0 && thisW > prevW) msgs.push({icon:'📈', text:'Ez a heted eddig jobban áll, mint az előző — tartsd a lendületet!'});
+  const lines = [];
+  if(warnings.length){
+    const names = warnings.slice(0,3).map(x=>x.t.name).join(', ');
+    lines.push({icon:'📋', text:`Heti prioritás a csapatnak: ${names}. Ide irányítsuk elsőként a figyelmet ezen a héten.`});
+  } else {
+    lines.push({icon:'✅', text:'A csapat minden területen aktív, nincs elhanyagolt front — tartsuk is így!'});
   }
-
-  // Random idézet mindig a végén
-  msgs.push({icon:'📜', text: QUOTES[Math.floor(Math.random()*QUOTES.length)]});
-
-  return msgs.slice(0,5);
+  lines.push({icon:'📊', text:`Karakter szint: ${overall.level} · ${overallTotalXp()} összes XP · ${streak} hetes sorozat · ${cur}. hét / 52.`});
+  lines.push({icon:'📜', text: QUOTES[Math.floor(Math.random()*QUOTES.length)]});
+  return lines;
 }
 
 /* ================= Toasts ================= */
@@ -589,27 +618,27 @@ function renderTabs(){
 }
 
 function renderDashboard(){
-  const coach = generateCoachMessages();
   const cur = getCurrentWeekIndex();
-  const trackCards = TRACKS.map(t=>{
-    const xp = trackTotalXp(t.id);
-    const lvl = trackLevel(xp);
-    return `
-      <div class="card track-card" style="--tc:${t.color}">
-        <div class="track-head">
-          <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
-          <span class="lvl-badge">Szint ${lvl.level}</span>
-        </div>
-        <div class="track-bar"><i style="width:${lvl.pct}%; --tc:${t.color}"></i></div>
-        <div class="track-meta"><span>${lvl.into} / ${lvl.need} XP</span><span>Összesen: ${xp} XP</span></div>
-      </div>`;
-  }).join('');
+  const pmLines = generatePMMessage();
+  const agentReports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+
+  const teamCards = agentReports.map(({t,r})=>`
+    <div class="card track-card" style="--tc:${t.color}">
+      <div class="track-head">
+        <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
+        <span class="lvl-badge">Szint ${r.level}</span>
+      </div>
+      <p class="small muted" style="margin-bottom:6px;">${AGENT_ROLES[t.id]}</p>
+      <div class="coach-msg" style="padding-top:0;border-top:none;"><span class="coach-icon">${r.icon}</span><span>${r.text}</span></div>
+      <button class="chip agent-suggest" data-suggest='${JSON.stringify({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${r.suggestion.text} <span class="xp-pill">+${r.suggestion.xp}</span></button>
+    </div>`
+  ).join('');
 
   return `
     <div class="section">
       <div class="card coach-card">
-        <h3>🤖 AI Segítő</h3>
-        <div>${coach.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${m.text}</span></div>`).join('')}</div>
+        <h3>🧭 Projektvezető (PM)</h3>
+        <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${m.text}</span></div>`).join('')}</div>
       </div>
     </div>
     <div class="section">
@@ -617,8 +646,9 @@ function renderDashboard(){
       <p class="muted small">Ezen a héten eddig szerzett XP: <b style="color:var(--gold-soft)">${weekScore(cur)}</b></p>
     </div>
     <div class="section">
-      <h3>Skill fák áttekintése</h3>
-      <div class="grid grid-3">${trackCards}</div>
+      <h3>Csapat — szakterületi ügynökök</h3>
+      <p class="muted small" style="margin-bottom:10px;">Minden ügynök csak a saját területét figyeli és javasol rá egy küldetést; a PM ezekből állítja össze a heti prioritást.</p>
+      <div class="grid grid-3">${teamCards}</div>
     </div>
   `;
 }
@@ -811,6 +841,14 @@ function bindDynamicHandlers(){
     el.onclick = ()=>{
       const d = JSON.parse(el.getAttribute('data-quick'));
       addQuest(viewingWeek, d.trackId, d.text, d.xp);
+    };
+  });
+  document.querySelectorAll('[data-suggest]').forEach(el=>{
+    el.onclick = ()=>{
+      const d = JSON.parse(el.getAttribute('data-suggest'));
+      const cur = getCurrentWeekIndex();
+      addQuest(cur, d.trackId, d.text, d.xp);
+      toast('Küldetés hozzáadva a(z) ' + cur + '. héthez — ' + TRACK_BY_ID[d.trackId].name);
     };
   });
   const prevBtn = document.getElementById('prevWeekBtn');
