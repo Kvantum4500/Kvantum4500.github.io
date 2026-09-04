@@ -359,7 +359,7 @@ function overallStage(level){
 
 const WEEKS_TOTAL = 52;
 const QUARTER_TARGET_XP = 300; // cél / negyedév / skill fa a boss fighthoz
-const BOSS_DEFEAT_THRESHOLD = 5; // hány skill fának kell elérnie a negyedéves célt a boss legyőzéséhez
+const BOSS_DEFEAT_THRESHOLD = 4; // hány skill fának kell elérnie a negyedéves célt a boss legyőzéséhez (9-ből)
 const EXPORT_REMINDER_DAYS = 14;
 const STORAGE_KEY = 'eletrpg_v1';
 const STATE_VERSION = 1;
@@ -373,6 +373,7 @@ function defaultState(){
     weeks: Array.from({length:WEEKS_TOTAL}, ()=>({quests:[]})),
     quarterReflections:['','','',''],
     favorites:[],
+    bossSeen:[false,false,false,false],
     onboarded:false
   };
 }
@@ -394,6 +395,7 @@ function normalizeState(s){
   if(typeof s.meta.lastExportAt !== 'string') s.meta.lastExportAt = null;
   if(!Array.isArray(s.quarterReflections) || s.quarterReflections.length !== 4) s.quarterReflections = ['','','',''];
   if(!Array.isArray(s.favorites)) s.favorites = [];
+  if(!Array.isArray(s.bossSeen) || s.bossSeen.length !== 4) s.bossSeen = [false,false,false,false];
   s.weeks.forEach(w=>{ if(!Array.isArray(w.quests)) w.quests = []; });
   if(typeof s.onboarded !== 'boolean') s.onboarded = false;
   return s;
@@ -532,8 +534,10 @@ function generateAgentReport(track){
 }
 
 // PM: a szakterületi ügynökök (már elkészített) jelentéseiből állítja össze a heti prioritást.
+// Ugyanazt a prioritizeReports() sorrendet használja, mint a fókusz mód és a heti
+// csomag, hogy a PM szövege sose mondjon mást, mint amit ténylegesen kiemelnek.
 function generatePMMessage(reports){
-  const warnings = reports.filter(x=>x.r.status==='warning').sort((a,b)=>b.r.neglected-a.r.neglected);
+  const warnings = prioritizeReports(reports).filter(x=>x.r.status==='warning');
   const cur = getCurrentWeekIndex();
   const overall = overallLevel(overallTotalXp());
   const streak = currentStreak();
@@ -576,12 +580,15 @@ function needsExportReminder(){
 
 /* ================= Javaslat-priorizálás (heti csomag / fókusz mód) ================= */
 
-// Elhanyagolt (warning) területek előre, utána a legalacsonyabb szintűek — mindkét
-// funkció (heti csomag felvétele, PM fókusz mód) ugyanazt a sorrendet használja.
+// Elhanyagolt (warning) területek előre — a legelhanyagoltabb elöl, ugyanaz a
+// sorrend, amit a PM üzenete is használ —, utána a legalacsonyabb szintűek.
+// Ez a függvény adja a sorrendet a heti csomagnak és a PM fókusz módnak is,
+// hogy soha ne mondjon mást a PM szövege, mint amit ténylegesen kiemel.
 function prioritizeReports(reports){
   return [...reports].sort((a,b)=>{
     if(a.r.status==='warning' && b.r.status!=='warning') return -1;
     if(b.r.status==='warning' && a.r.status!=='warning') return 1;
+    if(a.r.status==='warning' && b.r.status==='warning') return b.r.neglected - a.r.neglected;
     return a.r.level - b.r.level;
   });
 }
@@ -712,8 +719,14 @@ function resetAll(){
   `);
   document.getElementById('confirmResetBtn').onclick = ()=>{
     const name = state.meta.name;
+    const theme = state.meta.theme;
+    const lastExportAt = state.meta.lastExportAt;
+    const favorites = state.favorites;
     state = defaultState();
     state.meta.name = name;
+    state.meta.theme = theme;
+    state.meta.lastExportAt = lastExportAt;
+    state.favorites = favorites;
     state.onboarded = true;
     saveState();
     viewingWeek = 1;
@@ -792,7 +805,7 @@ function renderDashboard(){
         <span class="coach-icon status-icon" style="background:${sc}22;border:1px solid ${sc};">${r.icon}</span>
         <span>${r.text}</span>
       </div>
-      <button class="chip agent-suggest" data-suggest='${JSON.stringify({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${r.suggestion.text} <span class="xp-pill">+${r.suggestion.xp}</span></button>
+      <button class="chip agent-suggest" data-suggest='${escAttr({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${escapeHtml(r.suggestion.text)} <span class="xp-pill">+${r.suggestion.xp}</span></button>
     </div>`;
   }).join('');
 
@@ -885,7 +898,7 @@ function renderMapTab(){
     const ring = isCurrent ? `<circle cx="${p.x}" cy="${p.y}" r="${r+7}" fill="none" stroke="#f3d38a" stroke-width="2.5" opacity="0.8"><animate attributeName="r" values="${r+5};${r+11};${r+5}" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.9;0.15;0.9" dur="1.8s" repeatCount="indefinite"/></circle>` : '';
     const label = isBoss ? '🏰' : (isCurrent ? stage[1] : p.w);
     const bossLabel = isBoss ? `<text x="${p.x}" y="${p.y - r - 8}" text-anchor="middle" font-size="10" fill="#c9b8f0">Q${p.w/13} Boss</text>` : '';
-    return `<g data-jump="${p.w}" style="cursor:pointer;">
+    return `<g data-jump="${p.w}" tabindex="0" role="button" aria-label="${p.w}. hét${isBoss?' — negyedéves boss':''}" style="cursor:pointer;outline-offset:3px;">
         ${ring}
         <circle cx="${p.x}" cy="${p.y}" r="${r}" fill="${fill}" stroke="${isBoss?'#8e7cc3':'rgba(255,255,255,0.25)'}" stroke-width="${isBoss?2.5:1.5}"/>
         <text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-size="${isBoss?14:(isCurrent?15:9.5)}" fill="${reached?'#241a06':'#9aa1c0'}">${label}</text>
@@ -925,7 +938,7 @@ function renderWeekTab(){
         <span class="quest-text">${escapeHtml(q.text)}</span>
         <span class="tag" style="border-color:${track.color}55;color:${track.color}">${track.icon} ${track.name}</span>
         <span class="xp-pill">+${q.xp} XP</span>
-        <button class="del-btn fav-btn ${fav?'on':''}" data-fav='${JSON.stringify({trackId:q.trackId, text:q.text, xp:q.xp})}' title="Kedvenc">${fav?'★':'☆'}</button>
+        <button class="del-btn fav-btn ${fav?'on':''}" data-fav='${escAttr({trackId:q.trackId, text:q.text, xp:q.xp})}' title="Kedvenc">${fav?'★':'☆'}</button>
         <button class="del-btn" data-del="${q.id}" title="Törlés">✕</button>
       </div>`;
   }).join('') || '<p class="muted small">Még nincs küldetés ezen a héten. Adj hozzá egyet lentebb.</p>';
@@ -935,13 +948,17 @@ function renderWeekTab(){
       <div class="accordion-h" style="cursor:default;">⭐ Kedvenceid (gyors hozzáadás)</div>
       <div class="chips">${state.favorites.map(f=>{
         const track = TRACK_BY_ID[f.trackId];
-        return `<button class="chip" data-quick='${JSON.stringify({trackId:f.trackId, text:f.text, xp:f.xp})}'>${track.icon} ${f.text} <span class="xp-pill">+${f.xp}</span></button>`;
+        const payload = escAttr({trackId:f.trackId, text:f.text, xp:f.xp});
+        return `<span class="chip" style="padding-right:6px;">
+          <button data-quick='${payload}' style="background:none;border:none;color:inherit;font:inherit;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px;">${track.icon} ${escapeHtml(f.text)} <span class="xp-pill">+${f.xp}</span></button>
+          <button class="del-btn" data-fav='${payload}' title="Kedvenc eltávolítása" style="padding:0;">✕</button>
+        </span>`;
       }).join('')}</div>
     </div>` : '';
 
   const accordions = TRACKS.map(t=>{
     const chips = TEMPLATES[t.id].map(tp =>
-      `<button class="chip" data-quick='${JSON.stringify({trackId:t.id, text:tp.text, xp:tp.xp})}'>${t.icon} ${tp.text} <span class="xp-pill">+${tp.xp}</span></button>`
+      `<button class="chip" data-quick='${escAttr({trackId:t.id, text:tp.text, xp:tp.xp})}'>${t.icon} ${escapeHtml(tp.text)} <span class="xp-pill">+${tp.xp}</span></button>`
     ).join('');
     const isOpen = openAccordion===t.id;
     return `
@@ -1022,6 +1039,7 @@ function renderTimelineTab(){
       const score = weekScore(w);
       const intensity = score===0 ? 0.04 : Math.min(0.9, 0.15 + score/150);
       cells += `<div class="weekcell ${w===cur?'current':''} ${w===viewingWeek?'viewing':''}" data-jump="${w}"
+                  tabindex="0" role="button" aria-label="${w}. hét — ${score} XP"
                   style="background:rgba(232,182,76,${intensity})" title="${w}. hét — ${score} XP">${w}</div>`;
     }
     const started = cur >= startW;
@@ -1041,7 +1059,10 @@ function renderTimelineTab(){
         <div class="track-bar"><i style="width:${pct}%; --tc:${t.color}"></i></div>
       </div>`;
     }).join('');
-    const confetti = defeated ? renderConfetti() : '';
+    // A konfetti csak az első alkalommal játszódik le, amikor a boss legyőzötté válik.
+    const firstTimeDefeated = defeated && !state.bossSeen[q];
+    if(firstTimeDefeated){ state.bossSeen[q] = true; saveState(); }
+    const confetti = firstTimeDefeated ? renderConfetti() : '';
 
     blocks += `
       <div class="quarter-block">
@@ -1124,6 +1145,12 @@ function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// JSON.stringify nem escape-eli az aposztrófot — enélkül egy aposztrófot
+// tartalmazó egyéni küldetésszöveg idő előtt lezárná a data-* attribútumot.
+function escAttr(obj){
+  return escapeHtml(JSON.stringify(obj));
+}
+
 /* ================= Event binding ================= */
 
 function bindDynamicHandlers(){
@@ -1180,10 +1207,15 @@ function bindDynamicHandlers(){
     const text = document.getElementById('customText').value.trim();
     const xp = document.getElementById('customXp').value;
     if(!text){ toast('Írj be egy küldetés szöveget.'); return; }
-    addQuest(viewingWeek, trackId, text, xp);
+    const dup = state.weeks[viewingWeek-1].quests.some(q=>q.trackId===trackId && q.text===text);
+    const doAdd = ()=> addQuest(viewingWeek, trackId, text, xp);
+    if(dup) confirmModal('Ezt a küldetést már hozzáadtad ezen a héten. Biztosan mégegyszer felveszed (dupla XP-ért)?', doAdd);
+    else doAdd();
   };
   document.querySelectorAll('[data-jump]').forEach(el=>{
-    el.onclick = ()=>{ viewingWeek = Number(el.getAttribute('data-jump')); activeTab='week'; openAccordion=null; render(); };
+    const go = ()=>{ viewingWeek = Number(el.getAttribute('data-jump')); activeTab='week'; openAccordion=null; render(); };
+    el.onclick = go;
+    el.onkeydown = (e)=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); go(); } };
   });
   document.querySelectorAll('[data-reflection]').forEach(el=>{
     el.onchange = ()=>{
