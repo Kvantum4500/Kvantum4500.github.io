@@ -429,7 +429,7 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) return defaultState();
+    if(!Array.isArray(parsed.weeks) || parsed.weeks.length !== WEEKS_TOTAL) return defaultState();
     return normalizeState(parsed);
   }catch(e){
     return defaultState();
