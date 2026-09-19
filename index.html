@@ -390,13 +390,21 @@ function normalizeState(s){
   if(typeof s.version !== 'number') s.version = STATE_VERSION;
   if(!s.meta || typeof s.meta !== 'object') s.meta = {};
   if(typeof s.meta.name !== 'string') s.meta.name = '';
-  if(typeof s.meta.startDate !== 'string') s.meta.startDate = new Date().toISOString().slice(0,10);
+  if(typeof s.meta.startDate !== 'string' || isNaN(new Date(s.meta.startDate).getTime())) s.meta.startDate = new Date().toISOString().slice(0,10);
   if(s.meta.theme !== 'light' && s.meta.theme !== 'dark') s.meta.theme = 'dark';
   if(typeof s.meta.lastExportAt !== 'string') s.meta.lastExportAt = null;
   if(!Array.isArray(s.quarterReflections) || s.quarterReflections.length !== 4) s.quarterReflections = ['','','',''];
   if(!Array.isArray(s.favorites)) s.favorites = [];
+  s.favorites = s.favorites.filter(f=>f && TRACK_BY_ID[f.trackId]);
   if(!Array.isArray(s.bossSeen) || s.bossSeen.length !== 4) s.bossSeen = [false,false,false,false];
-  s.weeks.forEach(w=>{ if(!Array.isArray(w.quests)) w.quests = []; });
+  s.weeks.forEach(w=>{
+    if(!Array.isArray(w.quests)) w.quests = [];
+    w.quests = w.quests.filter(q => q && TRACK_BY_ID[q.trackId]);
+    w.quests.forEach(q=>{
+      if(typeof q.xp !== 'number' || isNaN(q.xp)) q.xp = 0;
+      if(typeof q.done !== 'boolean') q.done = false;
+    });
+  });
   if(typeof s.onboarded !== 'boolean') s.onboarded = false;
   return s;
 }
@@ -413,7 +421,11 @@ function loadState(){
   }
 }
 function saveState(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    toast('Nem sikerült menteni — valószínűleg betelt a böngésző tárhelye.');
+  }
 }
 
 function uid(){
@@ -528,7 +540,9 @@ function generateAgentReport(track){
 
   const existingTexts = new Set(state.weeks[cur-1].quests.filter(q=>q.trackId===track.id).map(q=>q.text));
   const pool = TEMPLATES[track.id];
-  const suggestion = pool.find(tp=>!existingTexts.has(tp.text)) || pool[Math.floor(Math.random()*pool.length)];
+  const suggestion = (Array.isArray(pool) && pool.length)
+    ? (pool.find(tp=>!existingTexts.has(tp.text)) || pool[Math.floor(Math.random()*pool.length)])
+    : {text:'Adj hozzá egyéni küldetést ezen a területen', xp:10};
 
   return {status, icon, text, suggestion, level:lvl.level, neglected};
 }
@@ -695,7 +709,7 @@ function importData(file){
   reader.onload = e => {
     try{
       const parsed = JSON.parse(e.target.result);
-      if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) throw new Error('invalid');
+      if(!Array.isArray(parsed.weeks) || parsed.weeks.length !== WEEKS_TOTAL) throw new Error('invalid');
       state = normalizeState(parsed);
       saveState();
       viewingWeek = clamp(getCurrentWeekIndex(),1,WEEKS_TOTAL);
@@ -718,15 +732,16 @@ function resetAll(){
     </div>
   `);
   document.getElementById('confirmResetBtn').onclick = ()=>{
-    const name = state.meta.name;
-    const theme = state.meta.theme;
-    const lastExportAt = state.meta.lastExportAt;
-    const favorites = state.favorites;
-    state = defaultState();
-    state.meta.name = name;
-    state.meta.theme = theme;
-    state.meta.lastExportAt = lastExportAt;
-    state.favorites = favorites;
+    // Csak a kampány-haladást nullázzuk (hetek/küldetések, negyedéves
+    // reflexiók, boss-fight animáció-jelzők, onboarding-státusz). Minden
+    // más meta-mező (pl. téma, utolsó export ideje, jövőbeli új mezők) és
+    // a kedvencek automatikusan érintetlenek maradnak, mert a teljes
+    // korábbi state-ből indulunk ki ahelyett, hogy defaultState()-re
+    // cserélnénk — így egy új meta-mező sem veszik el csendben reset után.
+    const preservedMeta = state.meta;
+    const preservedFavorites = state.favorites;
+    const freshDefaults = defaultState();
+    state = { ...freshDefaults, meta: preservedMeta, favorites: preservedFavorites };
     state.onboarded = true;
     saveState();
     viewingWeek = 1;
