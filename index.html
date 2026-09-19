@@ -36,6 +36,20 @@
   button{font-family:inherit;cursor:pointer;}
   .wrap{max-width:1080px;margin:0 auto;padding:18px 16px 40px;}
 
+  button:focus-visible,
+  .chip:focus-visible,
+  .tab-btn:focus-visible,
+  .check:focus-visible,
+  .del-btn:focus-visible,
+  .weekcell:focus-visible,
+  [tabindex]:focus-visible,
+  select:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible{
+    outline:2px solid var(--gold);
+    outline-offset:2px;
+  }
+
   .topbar{
     background:linear-gradient(180deg, rgba(232,182,76,0.10), transparent);
     border-bottom:1px solid var(--border);
@@ -62,10 +76,15 @@
   }
   .week-chip b{color:var(--gold-soft);}
 
-  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 20px;}
+  .tabs{
+    display:flex;gap:6px;flex-wrap:nowrap;margin:16px 0 20px;
+    overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{display:none;}
   .tab-btn{
     background:var(--card);border:1px solid var(--border);color:var(--muted);
     padding:9px 14px;border-radius:10px;font-size:13.5px;font-weight:600;transition:.15s;
+    flex-shrink:0;white-space:nowrap;
   }
   .tab-btn:hover{background:var(--card-hover);color:var(--text);}
   .tab-btn.active{background:linear-gradient(180deg, rgba(232,182,76,0.22), rgba(232,182,76,0.06));border-color:rgba(232,182,76,0.5);color:var(--gold-soft);}
@@ -94,6 +113,22 @@
   .track-bar > i{display:block;height:100%;background:var(--tc,var(--gold));}
   .track-meta{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);}
 
+  .console-card{background:#0a0c14;border-color:rgba(255,255,255,0.12);color:#eef0f7;
+    --text:#eef0f7;--muted:#9aa1c0;--border:rgba(255,255,255,0.09);
+    --card:rgba(255,255,255,0.045);--card-hover:rgba(255,255,255,0.075);--gold-soft:#f3d38a;
+    --danger:#e0616b;--success:#4fbf8b;}
+  :root[data-theme="light"] .console-card{background:#12141c;}
+  .console-log{font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace;font-size:12.5px;line-height:1.7;
+    max-height:520px;overflow-y:auto;padding-right:2px;}
+  .console-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 0;color:#dfe3f2;}
+  .console-tag{flex-shrink:0;border:1px solid;border-radius:4px;padding:0 6px;font-size:10.5px;font-weight:700;letter-spacing:.4px;}
+  .console-agent{flex-shrink:0;font-weight:700;}
+  .console-msg{color:#c3c8de;}
+  .console-prompt{color:var(--gold-soft);flex-shrink:0;}
+  .console-suggest-line{margin:0 0 6px 0;}
+  .console-suggest-line .agent-suggest{width:auto;margin-top:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .console-divider{border-top:1px dashed rgba(255,255,255,0.15);margin:8px 0;}
+
   .week-nav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
   .nav-btn{background:var(--card);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:7px 12px;font-size:14px;}
   .nav-btn:hover{background:var(--card-hover);}
@@ -104,18 +139,33 @@
   .quest-row{
     display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);
     border-radius:10px;margin-bottom:8px;background:rgba(255,255,255,0.02);
+    flex-wrap:wrap;
   }
   .quest-row.done{opacity:.55;}
   .quest-row.done .quest-text{text-decoration:line-through;}
   .check{
     width:22px;height:22px;border-radius:6px;border:2px solid var(--muted);flex-shrink:0;
     display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--bg);background:none;
+    position:relative;
+  }
+  .check::before{
+    content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:40px;height:40px;
   }
   .check.on{background:var(--success);border-color:var(--success);color:#08130d;}
-  .quest-text{flex:1;font-size:14px;}
+  .quest-text{flex:1 1 160px;min-width:0;font-size:14px;}
+  .quest-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);white-space:nowrap;}
   .xp-pill{font-size:11.5px;font-weight:700;color:var(--gold-soft);white-space:nowrap;}
-  .del-btn{background:none;border:none;color:var(--muted);font-size:16px;padding:2px 4px;}
+  .del-btn{
+    background:none;border:none;color:var(--muted);font-size:16px;padding:2px 4px;
+    position:relative;min-width:24px;min-height:24px;
+    display:inline-flex;align-items:center;justify-content:center;
+  }
+  .del-btn::before{
+    content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:40px;height:40px;
+  }
   .del-btn:hover{color:var(--danger);}
 
   .btn{
@@ -163,6 +213,17 @@
   }
   .fav-btn{font-size:15px;}
   .fav-btn.on{color:var(--gold-soft);}
+
+  .map-scroll{position:relative;}
+  @media (max-width:640px){
+    .map-scroll::after{
+      content:"";
+      position:absolute;top:0;right:0;bottom:0;width:28px;
+      background:linear-gradient(to right, transparent, var(--bg));
+      pointer-events:none;
+      border-radius:0 var(--radius) var(--radius) 0;
+    }
+  }
 
   .banner{
     display:flex;align-items:center;gap:10px;border-radius:12px;padding:12px 14px;font-size:13px;
@@ -390,13 +451,21 @@ function normalizeState(s){
   if(typeof s.version !== 'number') s.version = STATE_VERSION;
   if(!s.meta || typeof s.meta !== 'object') s.meta = {};
   if(typeof s.meta.name !== 'string') s.meta.name = '';
-  if(typeof s.meta.startDate !== 'string') s.meta.startDate = new Date().toISOString().slice(0,10);
+  if(typeof s.meta.startDate !== 'string' || isNaN(new Date(s.meta.startDate).getTime())) s.meta.startDate = new Date().toISOString().slice(0,10);
   if(s.meta.theme !== 'light' && s.meta.theme !== 'dark') s.meta.theme = 'dark';
   if(typeof s.meta.lastExportAt !== 'string') s.meta.lastExportAt = null;
   if(!Array.isArray(s.quarterReflections) || s.quarterReflections.length !== 4) s.quarterReflections = ['','','',''];
   if(!Array.isArray(s.favorites)) s.favorites = [];
+  s.favorites = s.favorites.filter(f=>f && TRACK_BY_ID[f.trackId]);
   if(!Array.isArray(s.bossSeen) || s.bossSeen.length !== 4) s.bossSeen = [false,false,false,false];
-  s.weeks.forEach(w=>{ if(!Array.isArray(w.quests)) w.quests = []; });
+  s.weeks.forEach(w=>{
+    if(!Array.isArray(w.quests)) w.quests = [];
+    w.quests = w.quests.filter(q => q && TRACK_BY_ID[q.trackId]);
+    w.quests.forEach(q=>{
+      if(typeof q.xp !== 'number' || isNaN(q.xp)) q.xp = 0;
+      if(typeof q.done !== 'boolean') q.done = false;
+    });
+  });
   if(typeof s.onboarded !== 'boolean') s.onboarded = false;
   return s;
 }
@@ -406,14 +475,18 @@ function loadState(){
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return defaultState();
     const parsed = JSON.parse(raw);
-    if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) return defaultState();
+    if(!Array.isArray(parsed.weeks) || parsed.weeks.length !== WEEKS_TOTAL) return defaultState();
     return normalizeState(parsed);
   }catch(e){
     return defaultState();
   }
 }
 function saveState(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    toast('Nem sikerült menteni — valószínűleg betelt a böngésző tárhelye.');
+  }
 }
 
 function uid(){
@@ -528,7 +601,9 @@ function generateAgentReport(track){
 
   const existingTexts = new Set(state.weeks[cur-1].quests.filter(q=>q.trackId===track.id).map(q=>q.text));
   const pool = TEMPLATES[track.id];
-  const suggestion = pool.find(tp=>!existingTexts.has(tp.text)) || pool[Math.floor(Math.random()*pool.length)];
+  const suggestion = (Array.isArray(pool) && pool.length)
+    ? (pool.find(tp=>!existingTexts.has(tp.text)) || pool[Math.floor(Math.random()*pool.length)])
+    : {text:'Adj hozzá egyéni küldetést ezen a területen', xp:10};
 
   return {status, icon, text, suggestion, level:lvl.level, neglected};
 }
@@ -695,7 +770,7 @@ function importData(file){
   reader.onload = e => {
     try{
       const parsed = JSON.parse(e.target.result);
-      if(!parsed.weeks || parsed.weeks.length !== WEEKS_TOTAL) throw new Error('invalid');
+      if(!Array.isArray(parsed.weeks) || parsed.weeks.length !== WEEKS_TOTAL) throw new Error('invalid');
       state = normalizeState(parsed);
       saveState();
       viewingWeek = clamp(getCurrentWeekIndex(),1,WEEKS_TOTAL);
@@ -718,15 +793,16 @@ function resetAll(){
     </div>
   `);
   document.getElementById('confirmResetBtn').onclick = ()=>{
-    const name = state.meta.name;
-    const theme = state.meta.theme;
-    const lastExportAt = state.meta.lastExportAt;
-    const favorites = state.favorites;
-    state = defaultState();
-    state.meta.name = name;
-    state.meta.theme = theme;
-    state.meta.lastExportAt = lastExportAt;
-    state.favorites = favorites;
+    // Csak a kampány-haladást nullázzuk (hetek/küldetések, negyedéves
+    // reflexiók, boss-fight animáció-jelzők, onboarding-státusz). Minden
+    // más meta-mező (pl. téma, utolsó export ideje, jövőbeli új mezők) és
+    // a kedvencek automatikusan érintetlenek maradnak, mert a teljes
+    // korábbi state-ből indulunk ki ahelyett, hogy defaultState()-re
+    // cserélnénk — így egy új meta-mező sem veszik el csendben reset után.
+    const preservedMeta = state.meta;
+    const preservedFavorites = state.favorites;
+    const freshDefaults = defaultState();
+    state = { ...freshDefaults, meta: preservedMeta, favorites: preservedFavorites };
     state.onboarded = true;
     saveState();
     viewingWeek = 1;
@@ -739,6 +815,7 @@ function resetAll(){
 
 const TABS = [
   {id:'dashboard', label:'⚡ Vezérlőpult'},
+  {id:'console', label:'🖥️ Ügynök Konzol'},
   {id:'map', label:'🗺️ Térkép'},
   {id:'week', label:'📜 Heti küldetések'},
   {id:'tracks', label:'🌳 Skill fák'},
@@ -756,6 +833,7 @@ function render(){
   renderTabs();
   const app = document.getElementById('app');
   if(activeTab==='dashboard') app.innerHTML = renderDashboard();
+  else if(activeTab==='console') app.innerHTML = renderAgentConsole();
   else if(activeTab==='map') app.innerHTML = renderMapTab();
   else if(activeTab==='week') app.innerHTML = renderWeekTab();
   else if(activeTab==='tracks') app.innerHTML = renderTracksTab();
@@ -797,13 +875,13 @@ function renderDashboard(){
     return `
     <div class="card track-card" style="--tc:${t.color}">
       <div class="track-head">
-        <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
+        <div class="track-title"><span>${t.icon}</span><span>${escapeHtml(t.name)}</span></div>
         <span class="lvl-badge">Szint ${r.level}</span>
       </div>
-      <p class="small muted" style="margin-bottom:6px;">${AGENT_ROLES[t.id]}</p>
+      <p class="small muted" style="margin-bottom:6px;">${escapeHtml(AGENT_ROLES[t.id])}</p>
       <div class="coach-msg" style="padding-top:0;border-top:none;">
         <span class="coach-icon status-icon" style="background:${sc}22;border:1px solid ${sc};">${r.icon}</span>
-        <span>${r.text}</span>
+        <span>${escapeHtml(r.text)}</span>
       </div>
       <button class="chip agent-suggest" data-suggest='${escAttr({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${escapeHtml(r.suggestion.text)} <span class="xp-pill">+${r.suggestion.xp}</span></button>
     </div>`;
@@ -813,7 +891,7 @@ function renderDashboard(){
     <div class="section">
       <div class="card coach-card">
         <h3>🧭 Projektvezető (PM)</h3>
-        <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${m.text}</span></div>`).join('')}</div>
+        <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${escapeHtml(m.text)}</span></div>`).join('')}</div>
         <div class="row" style="margin-top:12px;">
           <button class="btn secondary" id="weeklyPackBtn">📦 Heti csomag felvétele (3 küldetés)</button>
         </div>
@@ -830,6 +908,52 @@ function renderDashboard(){
       </div>
       <p class="muted small" style="margin-bottom:10px;">Minden ügynök csak a saját területét figyeli és javasol rá egy küldetést; a PM ezekből állítja össze a heti prioritást.${focusMode ? ' Fókusz módban csak a legfontosabb 3 terület látszik.' : ''}</p>
       <div class="grid grid-3">${teamCards}</div>
+    </div>
+  `;
+}
+
+const STATUS_TAG = {warning:'FIGYELEM', success:'OK', info:'INFO'};
+
+// Ugyanaz a 9 ügynök + PM adat, mint a Vezérlőpulton, csak egy folyamatos,
+// terminál-stílusú naplóban, sürgősség szerint rendezve (prioritizeReports) —
+// itt mindig mind a 9 ügynök látszik, fókusz mód nélkül.
+function renderAgentConsole(){
+  const agentReports = TRACKS.map(t=>({t, r: generateAgentReport(t)}));
+  const ordered = prioritizeReports(agentReports);
+  const pmLines = generatePMMessage(agentReports);
+
+  const pmBlock = pmLines.map(m=>`
+    <div class="console-line">
+      <span class="console-tag" style="color:var(--gold-soft);border-color:rgba(232,182,76,0.5);">PM</span>
+      <span class="console-msg">${m.icon} ${escapeHtml(m.text)}</span>
+    </div>`).join('');
+
+  const agentBlock = ordered.map(({t,r})=>{
+    const sc = STATUS_COLOR[r.status] || 'var(--muted)';
+    const tag = STATUS_TAG[r.status] || 'INFO';
+    return `
+    <div class="console-line">
+      <span class="console-tag" style="color:${sc};border-color:${sc}88;">${tag}</span>
+      <span class="console-agent" style="color:${t.color}">${t.icon} ${escapeHtml(AGENT_ROLES[t.id])}</span>
+      <span class="console-msg">${r.icon} ${escapeHtml(r.text)}</span>
+    </div>
+    <div class="console-line console-suggest-line">
+      <span class="console-prompt">›</span>
+      <button class="chip agent-suggest" data-suggest='${escAttr({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${escapeHtml(r.suggestion.text)} <span class="xp-pill">+${r.suggestion.xp}</span></button>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="section">
+      <div class="card console-card">
+        <h3>🖥️ Ügynök Konzol</h3>
+        <p class="muted small" style="margin-bottom:10px;">Élő napló mind a 9 szakterületi ügynök jelentéséből, sürgősség szerint rendezve — ugyanaz a sorrend, amit a PM üzenete és a heti csomag is használ.</p>
+        <div class="console-log">
+          ${pmBlock}
+          <div class="console-divider"></div>
+          ${agentBlock}
+        </div>
+      </div>
     </div>
   `;
 }
@@ -910,7 +1034,7 @@ function renderMapTab(){
     <div class="section">
       <h3>Fő pálya — a teljes 52 hetes utazás</h3>
       <p class="muted small">A kampányod egész éves útvonala. Kattints egy állomásra, hogy odaugorj arra a hétre. Jelenlegi formád: <b style="color:var(--gold-soft)">${stage[1]} ${stage[2]}</b></p>
-      <div class="card" style="overflow-x:auto;">
+      <div class="card map-scroll" style="overflow-x:auto;">
         <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:auto;min-width:600px;display:block;">
           <path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="4"/>
           ${nodesSvg}
@@ -936,10 +1060,12 @@ function renderWeekTab(){
       <div class="quest-row ${q.done?'done':''}">
         <button class="check ${q.done?'on':''}" data-toggle="${q.id}">${q.done?'✓':''}</button>
         <span class="quest-text">${escapeHtml(q.text)}</span>
-        <span class="tag" style="border-color:${track.color}55;color:${track.color}">${track.icon} ${track.name}</span>
-        <span class="xp-pill">+${q.xp} XP</span>
-        <button class="del-btn fav-btn ${fav?'on':''}" data-fav='${escAttr({trackId:q.trackId, text:q.text, xp:q.xp})}' title="Kedvenc">${fav?'★':'☆'}</button>
-        <button class="del-btn" data-del="${q.id}" title="Törlés">✕</button>
+        <div class="quest-meta">
+          <span class="tag" style="border-color:${track.color}55;color:${track.color}">${track.icon} ${track.name}</span>
+          <span class="xp-pill">+${q.xp} XP</span>
+          <button class="del-btn fav-btn ${fav?'on':''}" data-fav='${escAttr({trackId:q.trackId, text:q.text, xp:q.xp})}' title="Kedvenc">${fav?'★':'☆'}</button>
+          <button class="del-btn" data-del="${q.id}" title="Törlés">✕</button>
+        </div>
       </div>`;
   }).join('') || '<p class="muted small">Még nincs küldetés ezen a héten. Adj hozzá egyet lentebb.</p>';
 
@@ -1113,7 +1239,7 @@ function renderSettingsTab(){
         </div>
         <div class="field">
           <label>Kampány kezdő dátuma (1. hét kezdete)</label>
-          <input type="date" id="startDateInput" value="${state.meta.startDate}">
+          <input type="date" id="startDateInput" value="${escapeHtml(state.meta.startDate)}">
         </div>
         <div class="field">
           <label>Megjelenés</label>
@@ -1270,7 +1396,7 @@ function maybeOnboard(){
     </div>
     <div class="field">
       <label>Mikor kezdődjön az 1. hét?</label>
-      <input type="date" id="onboardDate" value="${state.meta.startDate}">
+      <input type="date" id="onboardDate" value="${escapeHtml(state.meta.startDate)}">
     </div>
     <button class="btn" id="onboardStartBtn">Kaland kezdése</button>
   `);
