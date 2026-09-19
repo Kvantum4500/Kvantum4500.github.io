@@ -797,13 +797,13 @@ function renderDashboard(){
     return `
     <div class="card track-card" style="--tc:${t.color}">
       <div class="track-head">
-        <div class="track-title"><span>${t.icon}</span><span>${t.name}</span></div>
+        <div class="track-title"><span>${t.icon}</span><span>${escapeHtml(t.name)}</span></div>
         <span class="lvl-badge">Szint ${r.level}</span>
       </div>
-      <p class="small muted" style="margin-bottom:6px;">${AGENT_ROLES[t.id]}</p>
+      <p class="small muted" style="margin-bottom:6px;">${escapeHtml(AGENT_ROLES[t.id])}</p>
       <div class="coach-msg" style="padding-top:0;border-top:none;">
         <span class="coach-icon status-icon" style="background:${sc}22;border:1px solid ${sc};">${r.icon}</span>
-        <span>${r.text}</span>
+        <span>${escapeHtml(r.text)}</span>
       </div>
       <button class="chip agent-suggest" data-suggest='${escAttr({trackId:t.id, text:r.suggestion.text, xp:r.suggestion.xp})}'>+ ${escapeHtml(r.suggestion.text)} <span class="xp-pill">+${r.suggestion.xp}</span></button>
     </div>`;
@@ -813,7 +813,7 @@ function renderDashboard(){
     <div class="section">
       <div class="card coach-card">
         <h3>🧭 Projektvezető (PM)</h3>
-        <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${m.text}</span></div>`).join('')}</div>
+        <div>${pmLines.map(m=>`<div class="coach-msg"><span class="coach-icon">${m.icon}</span><span>${escapeHtml(m.text)}</span></div>`).join('')}</div>
         <div class="row" style="margin-top:12px;">
           <button class="btn secondary" id="weeklyPackBtn">📦 Heti csomag felvétele (3 küldetés)</button>
         </div>
@@ -1113,7 +1113,7 @@ function renderSettingsTab(){
         </div>
         <div class="field">
           <label>Kampány kezdő dátuma (1. hét kezdete)</label>
-          <input type="date" id="startDateInput" value="${state.meta.startDate}">
+          <input type="date" id="startDateInput" value="${escapeHtml(state.meta.startDate)}">
         </div>
         <div class="field">
           <label>Megjelenés</label>
@@ -1270,7 +1270,7 @@ function maybeOnboard(){
     </div>
     <div class="field">
       <label>Mikor kezdődjön az 1. hét?</label>
-      <input type="date" id="onboardDate" value="${state.meta.startDate}">
+      <input type="date" id="onboardDate" value="${escapeHtml(state.meta.startDate)}">
     </div>
     <button class="btn" id="onboardStartBtn">Kaland kezdése</button>
   `);
